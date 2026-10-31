@@ -84,7 +84,11 @@ main {
   background: #eee;
 }
 
-.menu button {
+.menu button,
+.menu a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
   padding: 0.5rem;
   border: 0;
@@ -95,18 +99,23 @@ main {
   min-width: 0;
   font-size: clamp(0.85rem, 2.8vw, 1.6rem);
   line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
   cursor: pointer;
 }
 
-.menu button:last-child {
+.menu button:last-child,
+.menu a:last-child {
   border-right: 0;
 }
 
-.menu button:hover {
+.menu button:hover,
+.menu a:hover {
   background: #e4e4e4;
 }
 
-.menu button:focus-visible {
+.menu button:focus-visible,
+.menu a:focus-visible {
   outline: 2px solid #595959;
   outline-offset: -4px;
 }
@@ -216,6 +225,246 @@ main {
   line-height: 1.35;
 }
 
+.table-main {
+  padding-top: 1.4rem;
+}
+
+.table-nav,
+.stakes,
+.table-status,
+.felt,
+.controls,
+.hand-log {
+  width: min(54rem, calc(100vw - 2rem));
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.table-nav {
+  margin: 0 0 0.35rem;
+  text-align: left;
+}
+
+.table-nav a {
+  color: #595959;
+}
+
+.stakes,
+.table-status {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+}
+
+.felt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-areas:
+    "s2 s3 s4"
+    "s1 board s5"
+    "s0 s0 s0";
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  align-items: center;
+}
+
+.seat,
+.board-panel {
+  border: 1px solid #000;
+  background: #fff;
+  min-width: 0;
+}
+
+.seat {
+  padding: 0.45rem 0.4rem 0.55rem;
+}
+
+.s0 { grid-area: s0; }
+.s1 { grid-area: s1; }
+.s2 { grid-area: s2; }
+.s3 { grid-area: s3; }
+.s4 { grid-area: s4; }
+.s5 { grid-area: s5; }
+
+.s0 {
+  justify-self: center;
+  width: min(18rem, 100%);
+}
+
+.board-panel {
+  grid-area: board;
+  padding: 0.8rem 0.65rem 0.7rem;
+  min-height: 8.4rem;
+}
+
+.seat.acting {
+  background: #f4efe0;
+  outline: 2px solid #595959;
+  outline-offset: -3px;
+}
+
+.seat.folded {
+  opacity: 0.48;
+}
+
+.seat-name,
+.seat-meta,
+.seat-bet,
+.pot,
+.street-label {
+  margin: 0;
+}
+
+.seat-name,
+.pot {
+  font-size: 1.2rem;
+}
+
+.seat-meta,
+.seat-bet,
+.street-label {
+  margin-top: 0.12rem;
+  font-size: 0.98rem;
+}
+
+.cards {
+  display: flex;
+  justify-content: center;
+  gap: 0.32rem;
+  margin-top: 0.4rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 3.6rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #1c1c1c;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.card.red {
+  color: #7a3030;
+}
+
+.card.back {
+  background: #c4a24e;
+  box-shadow: inset 0 0 0 0.38rem #d2b35c;
+  color: transparent;
+}
+
+.board-cards {
+  min-height: 3.6rem;
+}
+
+.board-cards .card {
+  width: 2.85rem;
+  height: 4rem;
+  font-size: 1.15rem;
+}
+
+.actions,
+.raise-box {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 0.9rem;
+  border: 1px solid #000;
+  background: #fff;
+}
+
+.actions:empty {
+  display: none;
+}
+
+.raise-box {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.actions button,
+.raise-box button,
+.raise-box input,
+#rebuy {
+  flex: 1 1 7.2rem;
+  margin: 0;
+  padding: 0.75rem 0.45rem;
+  border: 0;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font-family: inherit;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.raise-box input {
+  flex: 1.4 1 12rem;
+  cursor: text;
+  border-radius: 0;
+}
+
+.raise-box .form-error {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0.45rem;
+}
+
+.actions button:hover,
+.raise-box button:hover,
+#rebuy:hover {
+  background: #f3f3f3;
+}
+
+.actions button:focus-visible,
+.raise-box button:focus-visible,
+.raise-box input:focus-visible,
+#rebuy:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: -4px;
+  position: relative;
+  z-index: 1;
+}
+
+#rebuy {
+  display: block;
+  flex: 0 0 auto;
+  width: min(16rem, calc(100vw - 2rem));
+  margin-top: 0.9rem;
+  border: 1px solid #000;
+}
+
+#rebuy[hidden] {
+  display: none;
+}
+
+.hand-log {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 11rem;
+  overflow: auto;
+  text-align: left;
+  font-size: 1.02rem;
+  line-height: 1.4;
+}
+
+.log-marker {
+  margin-top: 0.4rem;
+  font-style: italic;
+}
+
 @media (max-width: 640px) {
   .site-header h1 {
     font-size: 2rem;
@@ -245,5 +494,53 @@ main {
 
   .login-main {
     padding-top: 2rem;
+  }
+
+  .felt {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "s2 s3"
+      "s4 s5"
+      "board board"
+      "s1 s1"
+      "s0 s0";
+  }
+
+  .card,
+  .board-cards .card {
+    width: 2.15rem;
+    height: 3.05rem;
+    font-size: 0.95rem;
+  }
+
+  .controls:has(button:not([hidden])) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    width: auto;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    padding: 0.35rem 0.6rem 0.5rem;
+    background: #d2b35c;
+  }
+
+  .controls:has(button:not([hidden])) .actions,
+  .controls:has(button:not([hidden])) .raise-box {
+    margin-top: 0;
+  }
+
+  .controls:has(button:not([hidden])) .raise-box {
+    border-top: 1px solid #000;
+    border-bottom: 0;
+  }
+
+  .table-main:has(.controls button:not([hidden])) {
+    padding-bottom: 6.5rem;
+  }
+
+  .table-main:has(#raise-box) {
+    padding-bottom: 13rem;
   }
 }
