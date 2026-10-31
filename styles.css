@@ -18,7 +18,7 @@ body {
   flex-direction: column;
   background: #d2b35c;
   color: #595959;
-  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  font-family: Spectral, Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
 }
 
 .site-header {
@@ -119,6 +119,103 @@ main {
   line-height: 1.45;
 }
 
+.login-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem 2rem;
+}
+
+.login-header .subtitle {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: right;
+}
+
+.login-main {
+  padding-top: 2.75rem;
+}
+
+.auth-block {
+  width: min(36.125rem, calc(100vw - 2.5rem));
+  max-width: calc(100vw - 2.5rem);
+}
+
+.auth-block + .auth-block {
+  margin-top: 2.35rem;
+}
+
+.auth-heading {
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #000;
+  background: #fff;
+}
+
+.field-stack input,
+.field-stack button {
+  width: 100%;
+  margin: 0;
+  padding: 0.8rem 0.75rem;
+  border: 0;
+  border-top: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  font-family: inherit;
+  font-size: clamp(1.15rem, 2.6vw, 1.55rem);
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.field-stack > :first-child {
+  border-top: 0;
+}
+
+.field-stack input::placeholder {
+  color: #000;
+  font-style: italic;
+  opacity: 1;
+}
+
+.field-stack button {
+  cursor: pointer;
+}
+
+.field-stack button:hover {
+  background: #f3f3f3;
+}
+
+.field-stack input:focus-visible,
+.field-stack button:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: -4px;
+  position: relative;
+  z-index: 1;
+}
+
+.form-error {
+  margin: 0.7rem 0 0;
+  color: #7a3030;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 640px) {
   .site-header h1 {
     font-size: 2rem;
@@ -130,5 +227,23 @@ main {
 
   main {
     padding-top: 2.75rem;
+  }
+
+  .login-header {
+    flex-wrap: wrap;
+  }
+
+  .login-header .subtitle {
+    font-size: 1.05rem;
+  }
+
+  .login-title {
+    width: 100%;
+    font-size: 2rem;
+    text-align: right;
+  }
+
+  .login-main {
+    padding-top: 2rem;
   }
 }
