@@ -27,6 +27,10 @@ body {
   padding: 2.1rem 1.8rem 0;
 }
 
+.brand {
+  min-width: 0;
+}
+
 .site-header h1 {
   margin: 0;
   font-size: 2.4rem;
@@ -36,8 +40,8 @@ body {
 
 .subtitle {
   margin: 0.15rem 0 0;
-  font-size: 1.65rem;
-  line-height: 1.2;
+  font-size: 1.35rem;
+  line-height: 1.25;
 }
 
 main {
@@ -135,11 +139,6 @@ main {
   gap: 1.5rem 2rem;
 }
 
-.login-header .subtitle {
-  font-size: 1.35rem;
-  line-height: 1.25;
-}
-
 .login-title {
   margin: 0;
   font-size: 2.4rem;
@@ -227,7 +226,7 @@ main {
 
 .table-main {
   padding-top: 1.4rem;
-  padding-bottom: 6.5rem;
+  padding-bottom: 2rem;
 }
 
 .felt,
@@ -243,15 +242,11 @@ main {
 }
 
 .table-nav {
-  position: fixed;
-  right: 1.1rem;
-  bottom: 1rem;
-  z-index: 6;
+  align-self: flex-end;
   width: auto;
   max-width: calc(100vw - 2.2rem);
-  margin: 0;
-  padding: 0.35rem 0.2rem;
-  background: #d2b35c;
+  margin: 1.25rem 0 0;
+  padding: 0;
   text-align: right;
 }
 
@@ -402,9 +397,7 @@ main {
 
 .actions button,
 .raise-box button,
-.raise-box input,
-#rebuy,
-#play-bots {
+.raise-box input {
   flex: 1 1 7.2rem;
   margin: 0;
   padding: 0.75rem 0.45rem;
@@ -433,35 +426,77 @@ main {
 }
 
 .actions button:hover,
-.raise-box button:hover,
-#rebuy:hover,
-#play-bots:hover {
+.raise-box button:hover {
   background: #f3f3f3;
 }
 
 .actions button:focus-visible,
 .raise-box button:focus-visible,
-.raise-box input:focus-visible,
-#rebuy:focus-visible,
-#play-bots:focus-visible {
+.raise-box input:focus-visible {
   outline: 2px solid #595959;
   outline-offset: -4px;
   position: relative;
   z-index: 1;
 }
 
-#rebuy,
-#play-bots {
-  display: block;
-  flex: 0 0 auto;
-  width: min(16rem, calc(100vw - 2rem));
-  margin-top: 0.9rem;
-  border: 1px solid #000;
+.mode-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  width: min(22rem, calc(100vw - 2rem));
+  margin-top: 2.4rem;
 }
 
-#rebuy[hidden],
-#play-bots[hidden] {
+.mode-select button {
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 0.7rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font-family: inherit;
+  font-size: 1.2rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+#play-bots:hover {
+  background: #f3f3f3;
+}
+
+#play-friends {
+  background: #eee;
+  color: #595959;
+  cursor: not-allowed;
+}
+
+.mode-select button:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: -4px;
+}
+
+.mode-notice {
+  margin: 0;
+  min-height: 1.4em;
+  color: #000;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.mode-select[hidden],
+#match[hidden],
+.mode-notice[hidden] {
   display: none;
+}
+
+#match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .hand-log {
@@ -486,7 +521,7 @@ main {
   }
 
   .subtitle {
-    font-size: 1.2rem;
+    font-size: 1.05rem;
   }
 
   main {
@@ -495,10 +530,6 @@ main {
 
   .login-header {
     flex-wrap: wrap;
-  }
-
-  .login-header .subtitle {
-    font-size: 1.05rem;
   }
 
   .login-title {
@@ -563,15 +594,7 @@ main {
     padding-bottom: 8rem;
   }
 
-  .table-main:has(.controls button:not([hidden])) .table-nav {
-    bottom: 4rem;
-  }
-
   .table-main:has(#raise-box) {
     padding-bottom: 13rem;
-  }
-
-  .table-main:has(#raise-box) .table-nav {
-    bottom: 7.2rem;
   }
 }

@@ -35,6 +35,8 @@
   var logCursor;
   var dealToken = 0;
   var statusMessage = "";
+  var noticeTimer;
+  var NOTICE_MS = 3200;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -293,14 +295,6 @@
     return seat;
   }
 
-  function renderLobbySeat(player, index) {
-    var seat = el("article", "seat s" + index);
-    seat.appendChild(el("p", "seat-name", player.name));
-    seat.appendChild(el("p", "seat-meta", "$" + player.stack));
-    seat.appendChild(el("div", "cards"));
-    return seat;
-  }
-
   function setStatus(text) {
     var node;
     statusMessage = text;
@@ -315,19 +309,54 @@
     return node;
   }
 
-  function renderLobby() {
-    var table = document.getElementById("table");
-    var board = el("section", "board-panel");
-    var i;
-    clear(table);
-    setStatus("");
-    document.getElementById("play-bots").hidden = false;
-    for (i = 0; i < roster.length; i += 1) table.appendChild(renderLobbySeat(roster[i], i));
-    board.appendChild(el("p", "pot", "Pote $0"));
-    board.appendChild(el("div", "cards board-cards"));
-    board.appendChild(el("p", "street-label", ""));
-    board.appendChild(statusNode());
-    table.appendChild(board);
+  function hideNotice() {
+    var notice = document.getElementById("mode-notice");
+    clearTimeout(noticeTimer);
+    if (!notice) return;
+    notice.hidden = true;
+    notice.textContent = "";
+  }
+
+  function showUnavailable() {
+    var notice = document.getElementById("mode-notice");
+    notice.hidden = false;
+    notice.textContent = "essa funcionalidade ainda nao foi aplicada";
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(hideNotice, NOTICE_MS);
+  }
+
+  function showModeSelect() {
+    var raiseBox = document.getElementById("raise-box");
+    clearTimeout(timer);
+    dealToken += 1;
+    state = null;
+    if (raiseBox) raiseBox.remove();
+    clear(document.getElementById("actions"));
+    clear(document.getElementById("table"));
+    clear(document.getElementById("log"));
+    hideNotice();
+    document.getElementById("match").hidden = true;
+    document.getElementById("mode-select").hidden = false;
+  }
+
+  function freshRoster() {
+    roster = [
+      { id: "hero", name: "Você", stack: START, isHuman: true },
+      { id: "lia", name: "Bot 1", stack: START, isHuman: false },
+      { id: "caio", name: "Bot 2", stack: START, isHuman: false },
+      { id: "duda", name: "Bot 3", stack: START, isHuman: false },
+      { id: "ravi", name: "Bot 4", stack: START, isHuman: false },
+      { id: "nanda", name: "Bot 5", stack: START, isHuman: false },
+    ];
+    button = roster.length - 1;
+  }
+
+  function startMatch() {
+    freshRoster();
+    hideNotice();
+    document.getElementById("mode-select").hidden = true;
+    document.getElementById("match").hidden = false;
+    startHand();
   }
 
   function prefersReducedMotion() {
@@ -597,18 +626,12 @@
     }
   }
 
-  function showBust() {
-    setStatus("Você ficou sem fichas.");
-    document.getElementById("rebuy").hidden = false;
-    clear(document.getElementById("actions"));
-  }
-
   function finishHand() {
     syncRoster();
     button = (button + 1) % roster.length;
     render();
     if (roster[0].stack <= 0) {
-      showBust();
+      later(showModeSelect, HAND_PAUSE);
       return;
     }
     later(startHand, HAND_PAUSE);
@@ -648,14 +671,12 @@
 
   function startHand() {
     var seated = 0;
-    document.getElementById("rebuy").hidden = true;
-    document.getElementById("play-bots").hidden = true;
     roster.forEach(function (player) {
       if (!player.isHuman && player.stack <= 0) player.stack = START;
       if (player.stack > 0) seated += 1;
     });
     if (roster[0].stack <= 0 || seated < 2) {
-      showBust();
+      showModeSelect();
       return;
     }
     state = Poker.createHand({
@@ -674,24 +695,9 @@
   }
 
   function init() {
-    roster = [
-      { id: "hero", name: "Você", stack: START, isHuman: true },
-      { id: "lia", name: "Bot 1", stack: START, isHuman: false },
-      { id: "caio", name: "Bot 2", stack: START, isHuman: false },
-      { id: "duda", name: "Bot 3", stack: START, isHuman: false },
-      { id: "ravi", name: "Bot 4", stack: START, isHuman: false },
-      { id: "nanda", name: "Bot 5", stack: START, isHuman: false },
-    ];
-    button = roster.length - 1;
-    document.getElementById("rebuy").addEventListener("click", function () {
-      roster[0].stack = START;
-      startHand();
-    });
-    document.getElementById("play-bots").addEventListener("click", function () {
-      document.getElementById("play-bots").hidden = true;
-      startHand();
-    });
-    renderLobby();
+    document.getElementById("play-bots").addEventListener("click", startMatch);
+    document.getElementById("play-friends").addEventListener("click", showUnavailable);
+    showModeSelect();
   }
 
   if (typeof document !== "undefined") {

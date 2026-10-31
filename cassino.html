@@ -26,14 +26,19 @@
     </header>
 
     <main class="table-main">
-      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
-      <div id="table" class="felt"></div>
-      <div class="controls">
-        <div id="actions" class="actions"></div>
-        <button type="button" id="play-bots">Play with bots</button>
-        <button type="button" id="rebuy" hidden>Sentar de novo</button>
+      <div id="mode-select" class="mode-select">
+        <button type="button" id="play-bots">Jogar com bots</button>
+        <button type="button" id="play-friends" aria-disabled="true">Jogar com amigos</button>
+        <p id="mode-notice" class="mode-notice" hidden role="status"></p>
       </div>
-      <ol id="log" class="hand-log" aria-live="polite"></ol>
+      <div id="match" hidden>
+        <div id="table" class="felt"></div>
+        <div class="controls">
+          <div id="actions" class="actions"></div>
+        </div>
+        <ol id="log" class="hand-log" aria-live="polite"></ol>
+      </div>
+      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
     </main>
 
     <script src="poker.js"></script>
