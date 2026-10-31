@@ -343,9 +343,25 @@
     document.getElementById("mode-select").hidden = false;
   }
 
+  function heroMoney() {
+    if (typeof window !== "undefined" && window.PokerLifeAuth) return window.PokerLifeAuth.currentMoney();
+    return START;
+  }
+
+  function saveHeroMoney() {
+    var i;
+    if (typeof window === "undefined" || !window.PokerLifeAuth || !roster) return;
+    for (i = 0; i < roster.length; i += 1) {
+      if (roster[i].isHuman) {
+        window.PokerLifeAuth.setMoney(roster[i].stack);
+        return;
+      }
+    }
+  }
+
   function freshRoster() {
     roster = [
-      { id: "hero", name: "Você", stack: START, isHuman: true },
+      { id: "hero", name: "Você", stack: heroMoney(), isHuman: true },
       { id: "lia", name: "Bot 1", stack: START, isHuman: false },
       { id: "caio", name: "Bot 2", stack: START, isHuman: false },
       { id: "duda", name: "Bot 3", stack: START, isHuman: false },
@@ -646,6 +662,7 @@
         if (roster[j].id === state.players[i].id) roster[j].stack = state.players[i].stack;
       }
     }
+    saveHeroMoney();
   }
 
   function finishHand() {

@@ -1,6 +1,7 @@
 (function () {
   var ACCOUNTS_KEY = "pokerlife.accounts";
   var SESSION_KEY = "pokerlife.session";
+  var STARTING_MONEY = 500;
 
   function pageName() {
     var name = location.pathname.split("/").pop();
@@ -100,6 +101,7 @@
       username: trimmedUser,
       password: password,
       email: trimmedEmail,
+      money: STARTING_MONEY,
     });
 
     try {
@@ -111,6 +113,48 @@
     return null;
   }
 
+  function accountMoney(account) {
+    var value = account && account.money;
+    if (typeof value !== "number" || !isFinite(value)) return STARTING_MONEY;
+    return Math.max(0, Math.round(value));
+  }
+
+  function currentMoney() {
+    var name = currentUser();
+    if (!name) return STARTING_MONEY;
+    return accountMoney(findAccount(name));
+  }
+
+  function setMoney(amount) {
+    var name = currentUser();
+    var next = Math.round(Number(amount));
+    var accounts;
+    var i;
+    var account;
+    if (!name || !isFinite(next)) return;
+    next = Math.max(0, next);
+    accounts = readAccounts();
+    for (i = 0; i < accounts.length; i += 1) {
+      account = accounts[i];
+      if (!account || typeof account.username !== "string") continue;
+      if (account.username.toLowerCase() !== name.toLowerCase()) continue;
+      account.money = next;
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      return;
+    }
+  }
+
+  function paintBalance() {
+    var node = document.querySelector(".balance");
+    if (!node) return;
+    node.textContent = "Você tem $" + currentMoney();
+  }
+
+  window.PokerLifeAuth = {
+    currentMoney: currentMoney,
+    setMoney: setMoney,
+  };
+
   function showError(form, message) {
     var el = form.querySelector(".form-error");
     if (!el) return;
@@ -121,6 +165,11 @@
     }
     el.hidden = false;
     el.textContent = message;
+  }
+
+  if (!isLoginPage() && currentUser()) {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", paintBalance);
+    else paintBalance();
   }
 
   if (!isLoginPage() && !currentUser()) {
