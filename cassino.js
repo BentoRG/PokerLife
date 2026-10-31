@@ -5,8 +5,9 @@
   var BOT_PAUSE = 1700;
   var STREET_PAUSE = 2000;
   var HAND_PAUSE = 3600;
-  var DEAL_TRAVEL = 520;
-  var DEAL_FLIP = 180;
+  var DEAL_TRAVEL = 640;
+  var REVEAL_OUT = 460;
+  var REVEAL_IN = 560;
   var HANDS = {
     "royal-flush": "um royal flush",
     "straight-flush": "um straight flush",
@@ -34,6 +35,9 @@
   var timer;
   var logCursor;
   var dealToken = 0;
+  var shownBoard = 0;
+  var shownHoles = false;
+  var handClosing = false;
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
@@ -288,7 +292,7 @@
     }
     cards = el("div", "cards");
     if (!opts.hideHoles) {
-      hidden = !player.isHuman && !(state.revealed && !player.folded);
+      hidden = !player.isHuman && (player.folded || opts.coverShowdown || !state.revealed);
       for (i = 0; i < player.hole.length; i += 1) cards.appendChild(cardNode(player.hole[i], hidden));
     }
     seat.appendChild(cards);
@@ -380,6 +384,43 @@
     return queue;
   }
 
+  function flipCard(node, card, done) {
+    var token = dealToken;
+    var face;
+    function alive() {
+      return token === dealToken;
+    }
+    function finish() {
+      if (alive() && done) done();
+    }
+    if (!alive()) return;
+    if (prefersReducedMotion() || typeof node.animate !== "function") {
+      node.replaceWith(cardNode(card, false));
+      finish();
+      return;
+    }
+    node.animate([
+      { transform: "scaleX(1)" },
+      { transform: "scaleX(0)" }
+    ], { duration: REVEAL_OUT, easing: "ease-in", fill: "forwards" }).onfinish = function () {
+      var flipIn;
+      if (!alive()) return;
+      face = cardNode(card, false);
+      node.replaceWith(face);
+      if (typeof face.animate !== "function") {
+        finish();
+        return;
+      }
+      flipIn = face.animate([
+        { transform: "scaleX(0)" },
+        { transform: "scaleX(1)" }
+      ], { duration: REVEAL_IN, easing: "ease-out", fill: "both" });
+      flipIn.onfinish = function () {
+        finish();
+      };
+    };
+  }
+
   function playDeal(done) {
     var token = dealToken + 1;
     var queue;
@@ -433,34 +474,12 @@
         { transform: "translate(0px, 0px) scale(1)", opacity: 1 }
       ], { duration: DEAL_TRAVEL, easing: "ease-out", fill: "both" });
       travel.onfinish = function () {
-        var flipOut;
         if (!alive()) return;
         if (!player.isHuman) {
           tick();
           return;
         }
-        flipOut = node.animate([
-          { transform: "scaleX(1)" },
-          { transform: "scaleX(0)" }
-        ], { duration: DEAL_FLIP, easing: "ease-in", fill: "forwards" });
-        flipOut.onfinish = function () {
-          var face;
-          var flipIn;
-          if (!alive()) return;
-          face = cardNode(player.hole[step.card], false);
-          node.replaceWith(face);
-          if (typeof face.animate !== "function") {
-            tick();
-            return;
-          }
-          flipIn = face.animate([
-            { transform: "scaleX(0)" },
-            { transform: "scaleX(1)" }
-          ], { duration: DEAL_FLIP, easing: "ease-out", fill: "both" });
-          flipIn.onfinish = function () {
-            if (alive()) tick();
-          };
-        };
+        flipCard(node, player.hole[step.card], tick);
       };
     }
     tick();
@@ -473,8 +492,11 @@
     var i;
     clear(table);
     for (i = 0; i < state.players.length; i += 1) table.appendChild(renderSeat(state.players[i], i, opts));
+    opts = opts || {};
     board.appendChild(el("p", "pot", "Pote $" + Poker.potSize(state)));
-    for (i = 0; i < state.board.length; i += 1) cards.appendChild(cardNode(state.board[i], false));
+    for (i = 0; i < state.board.length; i += 1) {
+      cards.appendChild(cardNode(state.board[i], opts.boardDownFrom != null && i >= opts.boardDownFrom));
+    }
     board.appendChild(cards);
     board.appendChild(el("p", "street-label", STREETS[state.street] || ""));
     board.appendChild(statusNode());
@@ -627,14 +649,122 @@
   }
 
   function finishHand() {
+    if (handClosing) return;
+    handClosing = true;
     syncRoster();
-    button = (button + 1) % roster.length;
-    render();
-    if (roster[0].stack <= 0) {
-      later(showModeSelect, HAND_PAUSE);
+    later(showModeSelect, HAND_PAUSE);
+  }
+
+  function presentBoard(done) {
+    var from = shownBoard;
+    var token = dealToken;
+    var nodes;
+    var index;
+    function alive() {
+      return token === dealToken && state;
+    }
+    renderTable(prefersReducedMotion() ? null : { boardDownFrom: from });
+    setStatus(statusText());
+    if (!alive()) return;
+    if (prefersReducedMotion()) {
+      syncLog();
+      done();
       return;
     }
-    later(startHand, HAND_PAUSE);
+    nodes = document.querySelectorAll("#table .board-cards .card");
+    index = from;
+    function next() {
+      if (!alive()) return;
+      if (index >= state.board.length) {
+        syncLog();
+        done();
+        return;
+      }
+      if (!nodes[index]) {
+        index += 1;
+        next();
+        return;
+      }
+      flipCard(nodes[index], state.board[index], function () {
+        index += 1;
+        next();
+      });
+    }
+    next();
+  }
+
+  function presentShowdown(done) {
+    var token = dealToken;
+    var order = [];
+    var step;
+    var index;
+    var player;
+    function alive() {
+      return token === dealToken && state;
+    }
+    function revealSeat(seatIndex, cardIndex, nextSeat) {
+      var cards;
+      if (!alive()) return;
+      cards = document.querySelectorAll("#table .s" + seatIndex + " .cards .card");
+      if (cardIndex >= cards.length) {
+        nextSeat();
+        return;
+      }
+      flipCard(cards[cardIndex], state.players[seatIndex].hole[cardIndex], function () {
+        revealSeat(seatIndex, cardIndex + 1, nextSeat);
+      });
+    }
+    function nextPlayer() {
+      var seatIndex;
+      if (!alive()) return;
+      if (!order.length) {
+        setStatus(statusText());
+        syncLog();
+        done();
+        return;
+      }
+      seatIndex = order.shift();
+      revealSeat(seatIndex, 0, nextPlayer);
+    }
+    renderTable(prefersReducedMotion() ? null : { coverShowdown: true });
+    setStatus("Mostrando as cartas");
+    if (!alive()) return;
+    for (step = 1; step <= state.players.length; step += 1) {
+      index = (state.button + step) % state.players.length;
+      player = state.players[index];
+      if (player.isHuman || player.folded) continue;
+      order.push(index);
+    }
+    if (prefersReducedMotion()) {
+      renderTable();
+      setStatus(statusText());
+      syncLog();
+      done();
+      return;
+    }
+    nextPlayer();
+  }
+
+  function continueHand() {
+    if (!state || handClosing) return;
+    renderActions();
+    if (state.handOver) {
+      finishHand();
+      return;
+    }
+    if (state.toAct < 0) {
+      later(function () {
+        if (!state || handClosing) return;
+        Poker.advance(state);
+        pump();
+      }, STREET_PAUSE);
+      return;
+    }
+    if (state.players[state.toAct].isHuman) return;
+    later(function () {
+      if (!state || handClosing || !applyBot()) return;
+      pump();
+    }, BOT_PAUSE);
   }
 
   function applyBot() {
@@ -650,27 +780,32 @@
   }
 
   function pump() {
+    if (!state || handClosing) return;
+    if (state.board.length > shownBoard) {
+      presentBoard(function () {
+        if (!state || handClosing) return;
+        shownBoard = state.board.length;
+        continueHand();
+      });
+      return;
+    }
+    if (state.handOver && state.revealed && !shownHoles) {
+      presentShowdown(function () {
+        if (!state || handClosing) return;
+        shownHoles = true;
+        finishHand();
+      });
+      return;
+    }
     render();
-    if (!state || state.handOver) {
-      if (state && state.handOver) finishHand();
-      return;
-    }
-    if (state.toAct < 0) {
-      later(function () {
-        Poker.advance(state);
-        pump();
-      }, STREET_PAUSE);
-      return;
-    }
-    if (state.players[state.toAct].isHuman) return;
-    later(function () {
-      if (!applyBot()) return;
-      pump();
-    }, BOT_PAUSE);
+    continueHand();
   }
 
   function startHand() {
     var seated = 0;
+    shownBoard = 0;
+    shownHoles = false;
+    handClosing = false;
     roster.forEach(function (player) {
       if (!player.isHuman && player.stack <= 0) player.stack = START;
       if (player.stack > 0) seated += 1;

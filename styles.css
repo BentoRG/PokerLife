@@ -355,6 +355,7 @@ main {
   color: #1c1c1c;
   font-size: 1.05rem;
   line-height: 1;
+  transform-origin: center;
 }
 
 .card.red {
