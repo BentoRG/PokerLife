@@ -28,6 +28,7 @@
   var state;
   var timer;
   var logCursor;
+  var dealToken = 0;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -250,20 +251,21 @@
 
   function seatBadge(index) {
     var blinds = Poker.blindSeats(state);
-    if (index === state.button && index === blinds.sb) return "BTN/SB";
-    if (index === state.button) return "BTN";
-    if (index === blinds.sb) return "SB";
-    if (index === blinds.bb) return "BB";
-    return "";
+    var parts = [];
+    if (index === state.button) parts.push("Botão");
+    if (index === blinds.sb) parts.push("Small blind");
+    if (index === blinds.bb) parts.push("Big blind");
+    return parts.join(" · ");
   }
 
-  function renderSeat(player, index) {
+  function renderSeat(player, index, opts) {
     var className = "seat s" + index;
     var seat;
     var meta = [];
     var cards;
     var hidden;
     var i;
+    opts = opts || {};
     if (index === state.toAct) className += " acting";
     if (player.folded) className += " folded";
     seat = el("article", className);
@@ -277,19 +279,150 @@
       seat.appendChild(el("p", "seat-bet", "Aposta $" + player.streetBet));
     }
     cards = el("div", "cards");
-    hidden = !player.isHuman && !(state.revealed && !player.folded);
-    for (i = 0; i < player.hole.length; i += 1) cards.appendChild(cardNode(player.hole[i], hidden));
+    if (!opts.hideHoles) {
+      hidden = !player.isHuman && !(state.revealed && !player.folded);
+      for (i = 0; i < player.hole.length; i += 1) cards.appendChild(cardNode(player.hole[i], hidden));
+    }
     seat.appendChild(cards);
     return seat;
   }
 
-  function renderTable() {
+  function renderLobbySeat(player, index) {
+    var seat = el("article", "seat s" + index);
+    seat.appendChild(el("p", "seat-name", player.name));
+    seat.appendChild(el("p", "seat-meta", "$" + player.stack));
+    seat.appendChild(el("div", "cards"));
+    return seat;
+  }
+
+  function renderLobby() {
+    var table = document.getElementById("table");
+    var board = el("section", "board-panel");
+    var i;
+    clear(table);
+    document.getElementById("status").textContent = "";
+    document.getElementById("play-bots").hidden = false;
+    for (i = 0; i < roster.length; i += 1) table.appendChild(renderLobbySeat(roster[i], i));
+    board.appendChild(el("p", "pot", "Pote $0"));
+    board.appendChild(el("div", "cards board-cards"));
+    board.appendChild(el("p", "street-label", ""));
+    table.appendChild(board);
+  }
+
+  function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function dealQueue(table) {
+    var start = (table.button + 1) % table.players.length;
+    var queue = [];
+    var round;
+    var step;
+    var index;
+    if (table.players.length === 2) start = table.button;
+    for (round = 0; round < 2; round += 1) {
+      for (step = 0; step < table.players.length; step += 1) {
+        index = (start + step) % table.players.length;
+        if (table.players[index].hole.length <= round) continue;
+        queue.push({ index: index, card: round });
+      }
+    }
+    return queue;
+  }
+
+  function playDeal(done) {
+    var token = dealToken + 1;
+    var queue;
+    dealToken = token;
+    queue = dealQueue(state);
+    renderTable({ hideHoles: true });
+    if (prefersReducedMotion()) {
+      done();
+      return;
+    }
+    function alive() {
+      return token === dealToken;
+    }
+    function tick() {
+      var step;
+      var player;
+      var seatCards;
+      var node;
+      var board;
+      var origin;
+      var cardRect;
+      var dx;
+      var dy;
+      var travel;
+      if (!alive()) return;
+      if (!queue.length) {
+        done();
+        return;
+      }
+      step = queue.shift();
+      player = state.players[step.index];
+      seatCards = document.querySelector("#table .s" + step.index + " .cards");
+      if (!seatCards) {
+        done();
+        return;
+      }
+      node = cardNode(player.hole[step.card], true);
+      seatCards.appendChild(node);
+      if (typeof node.animate !== "function") {
+        if (player.isHuman) node.replaceWith(cardNode(player.hole[step.card], false));
+        tick();
+        return;
+      }
+      board = document.querySelector("#table .board-panel");
+      origin = board.getBoundingClientRect();
+      cardRect = node.getBoundingClientRect();
+      dx = origin.left + origin.width / 2 - (cardRect.left + cardRect.width / 2);
+      dy = origin.top + origin.height / 2 - (cardRect.top + cardRect.height / 2);
+      travel = node.animate([
+        { transform: "translate(" + dx + "px, " + dy + "px) scale(0.82)", opacity: 0.35 },
+        { transform: "translate(0px, 0px) scale(1)", opacity: 1 }
+      ], { duration: 300, easing: "ease-out", fill: "both" });
+      travel.onfinish = function () {
+        var flipOut;
+        if (!alive()) return;
+        if (!player.isHuman) {
+          tick();
+          return;
+        }
+        flipOut = node.animate([
+          { transform: "scaleX(1)" },
+          { transform: "scaleX(0)" }
+        ], { duration: 110, easing: "ease-in", fill: "forwards" });
+        flipOut.onfinish = function () {
+          var face;
+          var flipIn;
+          if (!alive()) return;
+          face = cardNode(player.hole[step.card], false);
+          node.replaceWith(face);
+          if (typeof face.animate !== "function") {
+            tick();
+            return;
+          }
+          flipIn = face.animate([
+            { transform: "scaleX(0)" },
+            { transform: "scaleX(1)" }
+          ], { duration: 110, easing: "ease-out", fill: "both" });
+          flipIn.onfinish = function () {
+            if (alive()) tick();
+          };
+        };
+      };
+    }
+    tick();
+  }
+
+  function renderTable(opts) {
     var table = document.getElementById("table");
     var board = el("section", "board-panel");
     var cards = el("div", "cards board-cards");
     var i;
     clear(table);
-    for (i = 0; i < state.players.length; i += 1) table.appendChild(renderSeat(state.players[i], i));
+    for (i = 0; i < state.players.length; i += 1) table.appendChild(renderSeat(state.players[i], i, opts));
     board.appendChild(el("p", "pot", "Pote $" + Poker.potSize(state)));
     for (i = 0; i < state.board.length; i += 1) cards.appendChild(cardNode(state.board[i], false));
     board.appendChild(cards);
@@ -495,6 +628,7 @@
   function startHand() {
     var seated = 0;
     document.getElementById("rebuy").hidden = true;
+    document.getElementById("play-bots").hidden = true;
     roster.forEach(function (player) {
       if (!player.isHuman && player.stack <= 0) player.stack = START;
       if (player.stack > 0) seated += 1;
@@ -511,24 +645,32 @@
     });
     logCursor = 0;
     marker("Nova mão · botão com " + roster[button].name);
-    pump();
+    document.getElementById("status").textContent = "Distribuindo as cartas";
+    syncLog();
+    playDeal(function () {
+      pump();
+    });
   }
 
   function init() {
     roster = [
       { id: "hero", name: "Você", stack: START, isHuman: true },
-      { id: "lia", name: "Lia", stack: START, isHuman: false },
-      { id: "caio", name: "Caio", stack: START, isHuman: false },
-      { id: "duda", name: "Duda", stack: START, isHuman: false },
-      { id: "ravi", name: "Ravi", stack: START, isHuman: false },
-      { id: "nanda", name: "Nanda", stack: START, isHuman: false },
+      { id: "lia", name: "1", stack: START, isHuman: false },
+      { id: "caio", name: "2", stack: START, isHuman: false },
+      { id: "duda", name: "3", stack: START, isHuman: false },
+      { id: "ravi", name: "4", stack: START, isHuman: false },
+      { id: "nanda", name: "5", stack: START, isHuman: false },
     ];
     button = roster.length - 1;
     document.getElementById("rebuy").addEventListener("click", function () {
       roster[0].stack = START;
       startHand();
     });
-    startHand();
+    document.getElementById("play-bots").addEventListener("click", function () {
+      document.getElementById("play-bots").hidden = true;
+      startHand();
+    });
+    renderLobby();
   }
 
   if (typeof document !== "undefined") {

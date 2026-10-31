@@ -227,6 +227,7 @@ main {
 
 .table-main {
   padding-top: 1.4rem;
+  padding-bottom: 4.5rem;
 }
 
 .table-nav,
@@ -245,8 +246,15 @@ main {
 }
 
 .table-nav {
-  margin: 0 0 0.35rem;
-  text-align: left;
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1rem;
+  z-index: 6;
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.2rem;
+  background: #d2b35c;
+  text-align: right;
 }
 
 .table-nav a {
@@ -393,7 +401,8 @@ main {
 .actions button,
 .raise-box button,
 .raise-box input,
-#rebuy {
+#rebuy,
+#play-bots {
   flex: 1 1 7.2rem;
   margin: 0;
   padding: 0.75rem 0.45rem;
@@ -423,21 +432,24 @@ main {
 
 .actions button:hover,
 .raise-box button:hover,
-#rebuy:hover {
+#rebuy:hover,
+#play-bots:hover {
   background: #f3f3f3;
 }
 
 .actions button:focus-visible,
 .raise-box button:focus-visible,
 .raise-box input:focus-visible,
-#rebuy:focus-visible {
+#rebuy:focus-visible,
+#play-bots:focus-visible {
   outline: 2px solid #595959;
   outline-offset: -4px;
   position: relative;
   z-index: 1;
 }
 
-#rebuy {
+#rebuy,
+#play-bots {
   display: block;
   flex: 0 0 auto;
   width: min(16rem, calc(100vw - 2rem));
@@ -445,7 +457,8 @@ main {
   border: 1px solid #000;
 }
 
-#rebuy[hidden] {
+#rebuy[hidden],
+#play-bots[hidden] {
   display: none;
 }
 
@@ -455,7 +468,7 @@ main {
   list-style: none;
   max-height: 11rem;
   overflow: auto;
-  text-align: left;
+  text-align: center;
   font-size: 1.02rem;
   line-height: 1.4;
 }
