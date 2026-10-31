@@ -260,7 +260,7 @@
       return player.streetBet;
     });
     state.currentBet = Math.max.apply(null, bets);
-    state.lastFullRaiseSize = state.bb;
+    state.lastFullRaiseSize = 1;
     state.toAct = nextActor(state, blinds.bb);
   }
 
@@ -290,7 +290,7 @@
       board: [],
       street: "preflop",
       currentBet: 0,
-      lastFullRaiseSize: opts.bb,
+      lastFullRaiseSize: 1,
       toAct: -1,
       handOver: false,
       revealed: false,
@@ -311,7 +311,6 @@
     var toCall;
     var actions;
     var maxTo;
-    var minFull;
     if (!state || state.handOver || state.toAct < 0) return null;
     player = state.players[state.toAct];
     toCall = state.currentBet - player.streetBet;
@@ -322,13 +321,12 @@
       minRaiseTo: null,
       maxRaiseTo: null,
     };
-    // A short all-in leaves acted set, so players who already acted cannot raise again.
+    // Any whole dollar above the current bet is legal, up to the player's stack.
     if (!player.acted && player.stack > toCall) {
       maxTo = player.streetBet + player.stack;
-      minFull = state.currentBet + state.lastFullRaiseSize;
       if (maxTo > state.currentBet) {
         actions.maxRaiseTo = maxTo;
-        actions.minRaiseTo = maxTo < minFull ? maxTo : minFull;
+        actions.minRaiseTo = Math.min(maxTo, state.currentBet + 1);
       }
     }
     return actions;
@@ -342,15 +340,12 @@
     var previous = state.currentBet;
     var paid = commit(player, to - player.streetBet);
     var increment = player.streetBet - previous;
-    var full = increment >= state.lastFullRaiseSize;
-    if (player.streetBet > previous && full) {
+    if (player.streetBet > previous) {
       state.lastFullRaiseSize = increment;
       state.currentBet = player.streetBet;
       state.players.forEach(function (other) {
         if (other !== player && !other.folded && !other.allIn) other.acted = false;
       });
-    } else if (player.streetBet > previous) {
-      state.currentBet = player.streetBet;
     }
     player.acted = true;
     return paid;
@@ -411,7 +406,7 @@
       player.acted = false;
     });
     state.currentBet = 0;
-    state.lastFullRaiseSize = state.bb;
+    state.lastFullRaiseSize = 1;
     state.log.push({ kind: "board", street: state.street, cards: cards.slice() });
     state.toAct = nextActor(state, state.button);
   }

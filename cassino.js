@@ -2,6 +2,11 @@
   var START = 500;
   var SB = 5;
   var BB = 10;
+  var BOT_PAUSE = 1700;
+  var STREET_PAUSE = 2000;
+  var HAND_PAUSE = 3600;
+  var DEAL_TRAVEL = 520;
+  var DEAL_FLIP = 180;
   var HANDS = {
     "royal-flush": "um royal flush",
     "straight-flush": "um straight flush",
@@ -252,7 +257,7 @@
   function seatBadge(index) {
     var blinds = Poker.blindSeats(state);
     var parts = [];
-    if (index === state.button) parts.push("Botão");
+    if (index === state.button) parts.push("Dealer");
     if (index === blinds.sb) parts.push("Small blind");
     if (index === blinds.bb) parts.push("Big blind");
     return parts.join(" · ");
@@ -381,7 +386,7 @@
       travel = node.animate([
         { transform: "translate(" + dx + "px, " + dy + "px) scale(0.82)", opacity: 0.35 },
         { transform: "translate(0px, 0px) scale(1)", opacity: 1 }
-      ], { duration: 300, easing: "ease-out", fill: "both" });
+      ], { duration: DEAL_TRAVEL, easing: "ease-out", fill: "both" });
       travel.onfinish = function () {
         var flipOut;
         if (!alive()) return;
@@ -392,7 +397,7 @@
         flipOut = node.animate([
           { transform: "scaleX(1)" },
           { transform: "scaleX(0)" }
-        ], { duration: 110, easing: "ease-in", fill: "forwards" });
+        ], { duration: DEAL_FLIP, easing: "ease-in", fill: "forwards" });
         flipOut.onfinish = function () {
           var face;
           var flipIn;
@@ -406,7 +411,7 @@
           flipIn = face.animate([
             { transform: "scaleX(0)" },
             { transform: "scaleX(1)" }
-          ], { duration: 110, easing: "ease-out", fill: "both" });
+          ], { duration: DEAL_FLIP, easing: "ease-out", fill: "both" });
           flipIn.onfinish = function () {
             if (alive()) tick();
           };
@@ -492,7 +497,6 @@
         humanAct("raise", amount);
       }));
     }
-    addPreset("Mínimo $" + legal.minRaiseTo, legal.minRaiseTo);
     addPreset("Meio pote $" + half, half);
     addPreset("Pote $" + pot, pot);
     input = document.createElement("input");
@@ -590,7 +594,7 @@
       showBust();
       return;
     }
-    later(startHand, 1700);
+    later(startHand, HAND_PAUSE);
   }
 
   function applyBot() {
@@ -615,14 +619,14 @@
       later(function () {
         Poker.advance(state);
         pump();
-      }, 800);
+      }, STREET_PAUSE);
       return;
     }
     if (state.players[state.toAct].isHuman) return;
     later(function () {
       if (!applyBot()) return;
       pump();
-    }, 700);
+    }, BOT_PAUSE);
   }
 
   function startHand() {
@@ -644,7 +648,7 @@
       bb: BB,
     });
     logCursor = 0;
-    marker("Nova mão · botão com " + roster[button].name);
+    marker("Nova mão · dealer com " + roster[button].name);
     document.getElementById("status").textContent = "Distribuindo as cartas";
     syncLog();
     playDeal(function () {

@@ -71,7 +71,7 @@ check("seven cards use the best five", function () {
   assert.deepStrictEqual(rankOf(["As", "Ah", "Ad", "Ac", "Kd", "Qs", "2c"]), [7, 14, 13, 0, 0, 0]);
 });
 
-check("heads-up blinds and minimum bet", function () {
+check("heads-up blinds allow a bet of any size", function () {
   var state = Poker.createHand({
     players: [
       { id: "a", name: "Ana", stack: 500 },
@@ -89,10 +89,13 @@ check("heads-up blinds and minimum bet", function () {
   act(state, "check");
   assert.strictEqual(Poker.advance(state).event, "flop");
   assert.strictEqual(state.players[state.toAct].id, "b");
-  assert.strictEqual(Poker.act(state, "raise", 5).ok, false);
+  assert.strictEqual(Poker.act(state, "raise", 0).ok, false);
   assert.strictEqual(state.players[1].stack, 490);
-  act(state, "check");
-  act(state, "check");
+  assert.strictEqual(Poker.act(state, "raise", 1).ok, true);
+  assert.strictEqual(state.players[1].streetBet, 1);
+  assert.strictEqual(state.players[1].stack, 489);
+  act(state, "call");
+  assert.strictEqual(Poker.advance(state).event, "turn");
 });
 
 check("full hand awards the straight", function () {
@@ -194,7 +197,7 @@ check("odd chip goes to the first live seat left of the button", function () {
   assert.strictEqual(chips(state), 15);
 });
 
-check("short all-in does not reopen a player who already acted", function () {
+check("a raise of one dollar above the current bet is legal", function () {
   var state = Poker.createHand({
     players: [
       { id: "a", name: "Ana", stack: 500 },
@@ -223,27 +226,21 @@ check("short all-in does not reopen a player who already acted", function () {
   act(state, "call");
   legal = Poker.legalActions(state);
   assert.strictEqual(state.players[state.toAct].id, "c");
-  assert.strictEqual(legal.minRaiseTo, 130);
+  assert.strictEqual(legal.minRaiseTo, 101);
   act(state, "raise", 130);
   legal = Poker.legalActions(state);
   assert.strictEqual(state.players[state.toAct].id, "d");
   assert.strictEqual(legal.call, 130);
-  assert.strictEqual(legal.minRaiseTo, 230);
+  assert.strictEqual(legal.minRaiseTo, 131);
   act(state, "fold");
   legal = Poker.legalActions(state);
   assert.strictEqual(state.players[state.toAct].id, "a");
   assert.strictEqual(legal.call, 30);
-  assert.strictEqual(legal.minRaiseTo, null);
-  assert.strictEqual(Poker.act(state, "raise", 200).ok, false);
-  assert.strictEqual(state.players[0].stack, 390);
-  act(state, "call");
-  legal = Poker.legalActions(state);
-  assert.strictEqual(state.players[state.toAct].id, "b");
-  assert.strictEqual(legal.minRaiseTo, null);
-  assert.strictEqual(legal.call, 30);
+  assert.strictEqual(legal.minRaiseTo, 131);
+  assert.strictEqual(Poker.act(state, "raise", 131).ok, true);
 });
 
-check("a full raise after a short all-in reopens action", function () {
+check("any raise above the current bet reopens action", function () {
   var state = Poker.createHand({
     players: [
       { id: "a", name: "Ana", stack: 500 },
@@ -270,11 +267,11 @@ check("a full raise after a short all-in reopens action", function () {
   act(state, "call");
   act(state, "raise", 130);
   legal = Poker.legalActions(state);
-  assert.strictEqual(legal.minRaiseTo, 230);
-  act(state, "raise", 230);
+  assert.strictEqual(legal.minRaiseTo, 131);
+  act(state, "raise", 131);
   legal = Poker.legalActions(state);
   assert.strictEqual(state.players[state.toAct].id, "a");
-  assert.strictEqual(legal.minRaiseTo, 330);
+  assert.strictEqual(legal.minRaiseTo, 132);
   assert.ok(legal.maxRaiseTo > legal.minRaiseTo);
 });
 
