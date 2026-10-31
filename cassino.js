@@ -34,6 +34,7 @@
   var timer;
   var logCursor;
   var dealToken = 0;
+  var statusMessage = "";
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -300,17 +301,32 @@
     return seat;
   }
 
+  function setStatus(text) {
+    var node;
+    statusMessage = text;
+    node = document.getElementById("status");
+    if (node) node.textContent = statusMessage;
+  }
+
+  function statusNode() {
+    var node = el("p", "table-status", statusMessage);
+    node.id = "status";
+    node.setAttribute("aria-live", "polite");
+    return node;
+  }
+
   function renderLobby() {
     var table = document.getElementById("table");
     var board = el("section", "board-panel");
     var i;
     clear(table);
-    document.getElementById("status").textContent = "";
+    setStatus("");
     document.getElementById("play-bots").hidden = false;
     for (i = 0; i < roster.length; i += 1) table.appendChild(renderLobbySeat(roster[i], i));
     board.appendChild(el("p", "pot", "Pote $0"));
     board.appendChild(el("div", "cards board-cards"));
     board.appendChild(el("p", "street-label", ""));
+    board.appendChild(statusNode());
     table.appendChild(board);
   }
 
@@ -432,6 +448,7 @@
     for (i = 0; i < state.board.length; i += 1) cards.appendChild(cardNode(state.board[i], false));
     board.appendChild(cards);
     board.appendChild(el("p", "street-label", STREETS[state.street] || ""));
+    board.appendChild(statusNode());
     table.appendChild(board);
   }
 
@@ -564,7 +581,7 @@
 
   function render() {
     if (!state) return;
-    document.getElementById("status").textContent = statusText();
+    setStatus(statusText());
     renderTable();
     renderActions();
     syncLog();
@@ -581,7 +598,7 @@
   }
 
   function showBust() {
-    document.getElementById("status").textContent = "Você ficou sem fichas.";
+    setStatus("Você ficou sem fichas.");
     document.getElementById("rebuy").hidden = false;
     clear(document.getElementById("actions"));
   }
@@ -649,7 +666,7 @@
     });
     logCursor = 0;
     marker("Nova mão · dealer com " + roster[button].name);
-    document.getElementById("status").textContent = "Distribuindo as cartas";
+    setStatus("Distribuindo as cartas");
     syncLog();
     playDeal(function () {
       pump();
@@ -659,11 +676,11 @@
   function init() {
     roster = [
       { id: "hero", name: "Você", stack: START, isHuman: true },
-      { id: "lia", name: "1", stack: START, isHuman: false },
-      { id: "caio", name: "2", stack: START, isHuman: false },
-      { id: "duda", name: "3", stack: START, isHuman: false },
-      { id: "ravi", name: "4", stack: START, isHuman: false },
-      { id: "nanda", name: "5", stack: START, isHuman: false },
+      { id: "lia", name: "Bot 1", stack: START, isHuman: false },
+      { id: "caio", name: "Bot 2", stack: START, isHuman: false },
+      { id: "duda", name: "Bot 3", stack: START, isHuman: false },
+      { id: "ravi", name: "Bot 4", stack: START, isHuman: false },
+      { id: "nanda", name: "Bot 5", stack: START, isHuman: false },
     ];
     button = roster.length - 1;
     document.getElementById("rebuy").addEventListener("click", function () {
