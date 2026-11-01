@@ -37,6 +37,31 @@
           <p class="form-error" role="alert" hidden></p>
         </form>
 
+        <p>
+          <button type="button" class="email-change" id="change-password">(trocar senha)</button>
+        </p>
+        <form id="password-form" class="email-swap" hidden>
+          <div class="field-stack">
+            <input type="email" name="email" autocomplete="email" placeholder="Seu email" required />
+            <input
+              type="password"
+              name="password"
+              autocomplete="new-password"
+              placeholder="Senha nova"
+              required
+            />
+            <input
+              type="password"
+              name="confirm"
+              autocomplete="new-password"
+              placeholder="Confirme a senha nova"
+              required
+            />
+            <button type="submit">Mudar</button>
+          </div>
+          <p class="form-error" role="alert" hidden></p>
+        </form>
+
         <h2>Itens colecionados:</h2>
         <ul>
           <li>Asdf</li>
@@ -52,6 +77,8 @@
         <p>-$40 → compra do item asdf</p>
         <p>+$100 → mesada do dia</p>
         <p>30/10/2026</p>
+
+        <button type="button" class="account-logout" id="logout">Sair</button>
       </section>
 
       <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
@@ -60,6 +87,11 @@
     <script>
       document.getElementById("change-email").addEventListener("click", function () {
         var form = document.getElementById("email-form");
+        form.hidden = false;
+        form.querySelector("input").focus();
+      });
+      document.getElementById("change-password").addEventListener("click", function () {
+        var form = document.getElementById("password-form");
         form.hidden = false;
         form.querySelector("input").focus();
       });

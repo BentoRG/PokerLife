@@ -380,10 +380,20 @@
     }
   }
 
-  function changePassword(current, next, confirm) {
+  function signOut() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch (error) {}
+    location.replace("login.html");
+  }
+
+  function changePassword(email, next, confirm) {
     var account = findAccount(currentUser() || "");
-    if (!current || !next || !confirm) return "Preencha todos os campos.";
-    if (!account || account.password !== current) return "Senha antiga incorreta.";
+    var trimmed = String(email || "").trim();
+    if (!trimmed || !next || !confirm) return "Preencha todos os campos.";
+    if (!account || String(account.email || "").toLowerCase() !== trimmed.toLowerCase()) {
+      return "Esse email não é o da sua conta.";
+    }
     if (next !== confirm) return "As senhas não coincidem.";
     try {
       if (!updateAccount(function (record) {
@@ -438,12 +448,13 @@
   function bindAccountForms() {
     var passwordForm = document.querySelector("#password-form");
     var emailForm = document.querySelector("#email-form");
+    var logout = document.querySelector("#logout");
     if (passwordForm) {
       passwordForm.addEventListener("submit", function (event) {
         event.preventDefault();
         var data = new FormData(passwordForm);
         var message = changePassword(
-          String(data.get("current") || ""),
+          String(data.get("email") || ""),
           String(data.get("password") || ""),
           String(data.get("confirm") || "")
         );
@@ -467,6 +478,11 @@
         emailForm.reset();
         showFormMessage(emailForm, "Email alterado.", true);
         paintProfile();
+      });
+    }
+    if (logout) {
+      logout.addEventListener("click", function () {
+        signOut();
       });
     }
   }
