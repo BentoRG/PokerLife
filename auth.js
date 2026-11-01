@@ -150,6 +150,15 @@
     node.textContent = "Você tem $" + currentMoney();
   }
 
+  function paintAccount() {
+    var name = currentUser();
+    var welcome = document.querySelector(".welcome-name");
+    var profile = document.querySelector(".profile-name");
+    if (welcome && name) welcome.textContent = name;
+    if (profile && name) profile.textContent = name;
+    paintBalance();
+  }
+
   window.PokerLifeAuth = {
     currentMoney: currentMoney,
     setMoney: setMoney,
@@ -168,8 +177,8 @@
   }
 
   if (!isLoginPage() && currentUser()) {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", paintBalance);
-    else paintBalance();
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", paintAccount);
+    else paintAccount();
   }
 
   if (!isLoginPage() && !currentUser()) {
