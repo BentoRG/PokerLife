@@ -685,7 +685,7 @@ main {
   }
 
   .home-header .subtitle {
-    max-width: 10.5rem;
+    max-width: 100%;
   }
 
   .home-header + main,
