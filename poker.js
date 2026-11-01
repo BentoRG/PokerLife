@@ -158,14 +158,24 @@
     return 0;
   }
 
-  function rankCards(cards) {
+  function bestHand(cards) {
     var best = null;
+    var bestCards = null;
     if (!cards || cards.length < 5) return null;
     combinations(cards, 5).forEach(function (hand) {
       var rank = rankFive(hand);
-      if (!best || compareRanks(rank, best) > 0) best = rank;
+      if (!best || compareRanks(rank, best) > 0) {
+        best = rank;
+        bestCards = hand.slice();
+      }
     });
-    return best;
+    if (!best) return null;
+    return { rank: best, cards: bestCards };
+  }
+
+  function rankCards(cards) {
+    var found = bestHand(cards);
+    return found ? found.rank : null;
   }
 
   function handName(rank) {
@@ -456,9 +466,15 @@
     state.revealed = live.length > 1;
     if (state.revealed) {
       live.forEach(function (player) {
-        var rank = rankCards(player.hole.concat(state.board));
-        player.handRank = rank;
-        state.log.push({ kind: "show", playerId: player.id, hand: handName(rank) });
+        var found = bestHand(player.hole.concat(state.board));
+        player.handRank = found ? found.rank : null;
+        player.handCards = found ? found.cards.slice() : null;
+        state.log.push({
+          kind: "show",
+          playerId: player.id,
+          hand: handName(player.handRank),
+          cards: player.handCards ? player.handCards.slice() : null,
+        });
       });
     }
     pots = buildPots(state.players);
@@ -486,12 +502,15 @@
       extra = pot.amount % ordered.length;
       ordered.forEach(function (player, index) {
         var gain = share + (index < extra ? 1 : 0);
-        var row = totals[player.id] || { playerId: player.id, amount: 0, hand: null, refund: true };
+        var row = totals[player.id] || { playerId: player.id, amount: 0, hand: null, cards: null, refund: true };
         var uncalled = state.revealed && pot.contenders.length === 1;
         player.stack += gain;
         row.amount += gain;
         if (!uncalled) row.refund = false;
-        if (pot.contenders.length > 1 && player.handRank) row.hand = handName(player.handRank);
+        if (pot.contenders.length > 1 && player.handRank) {
+          row.hand = handName(player.handRank);
+          row.cards = player.handCards ? player.handCards.slice() : null;
+        }
         totals[player.id] = row;
       });
     });
@@ -507,6 +526,7 @@
           playerId: payout.playerId,
           amount: payout.amount,
           hand: payout.hand,
+          cards: payout.cards ? payout.cards.slice() : null,
           refund: payout.refund,
         });
       }
@@ -539,6 +559,7 @@
     freshDeck: freshDeck,
     cardParts: cardParts,
     rankCards: rankCards,
+    bestHand: bestHand,
     compareRanks: compareRanks,
     handName: handName,
     potSize: potSize,

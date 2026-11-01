@@ -441,6 +441,10 @@ main {
   font-size: clamp(1.05rem, 2.2vw, 1.35rem);
 }
 
+.table-status.result {
+  font-weight: 600;
+}
+
 .felt {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -482,40 +486,21 @@ main {
   margin: 0.35rem 0;
 }
 
-.board-panel:has(.play-again) {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-}
-
-.play-again {
-  flex: 1;
-  width: 100%;
-  margin: 0;
-  padding: 1.25rem 1rem;
-  border: 1px solid #000;
-  background: #fff;
-  color: #000;
-  font-family: inherit;
-  font-size: 2.75rem;
-  line-height: 1.15;
-  text-align: center;
-  cursor: pointer;
-}
-
-.play-again:hover {
-  background: #f3f3f3;
-}
-
-.play-again:focus-visible {
-  outline: 2px solid #595959;
-  outline-offset: -4px;
-  background: #f3f3f3;
+.actions .play-again {
+  flex: 1 1 100%;
+  font-size: 1.35rem;
+  padding: 0.95rem 0.75rem;
 }
 
 .seat.acting {
   background: #f4efe0;
   outline: 2px solid #595959;
+  outline-offset: -3px;
+}
+
+.seat.winner {
+  background: #f4efe0;
+  outline: 2px solid #000;
   outline-offset: -3px;
 }
 
@@ -526,6 +511,7 @@ main {
 .seat-name,
 .seat-meta,
 .seat-bet,
+.seat-result,
 .pot,
 .street-label {
   margin: 0;
@@ -538,9 +524,14 @@ main {
 
 .seat-meta,
 .seat-bet,
+.seat-result,
 .street-label {
   margin-top: 0.12rem;
   font-size: 0.98rem;
+}
+
+.seat-result {
+  font-weight: 600;
 }
 
 .cards {
@@ -567,6 +558,11 @@ main {
 
 .card.red {
   color: #7a3030;
+}
+
+.card.made {
+  background: #f4efe0;
+  box-shadow: inset 0 0 0 2px #000;
 }
 
 .card.back {
@@ -958,16 +954,13 @@ main {
     padding: 0.4rem 0.35rem 0.35rem;
   }
 
-  .board-panel:has(.play-again) {
-    align-items: center;
-    min-height: 7.5rem;
-  }
-
-  .play-again {
-    flex: 0 1 auto;
-    width: min(28rem, 100%);
+  .actions .play-again {
     padding: 0.8rem 0.65rem;
     font-size: 1.05rem;
+  }
+
+  .seat-result {
+    font-size: 0.82rem;
   }
 
   .cards {

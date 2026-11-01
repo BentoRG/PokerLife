@@ -56,6 +56,10 @@ check("hand ladder and wheel", function () {
   var i;
   for (i = 1; i < ladder.length; i += 1) beats(ladder[i - 1], ladder[i]);
   ties(["As", "Kd", "Qc", "Jh", "9s"], ["Ad", "Kh", "Qs", "Jc", "9d"]);
+  assert.deepStrictEqual(
+    Poker.bestHand(["Th", "2c", "Ah", "Kh", "Qh", "Jh", "9h"]).cards.slice().sort(),
+    ["Ah", "Jh", "Kh", "Qh", "Th"]
+  );
   assert.strictEqual(Poker.handName(rankOf(["As", "Ks", "Qs", "Js", "Ts"])), "royal-flush");
   assert.strictEqual(Poker.handName(rankOf(["As", "2s", "3s", "4s", "5s"])), "straight-flush");
   assert.strictEqual(Poker.handName(rankOf(["As", "2c", "3d", "4h", "5s"])), "straight");
@@ -134,6 +138,7 @@ check("full hand awards the straight", function () {
   assert.strictEqual(chips(state), 1500);
   assert.strictEqual(state.payouts[0].playerId, "a");
   assert.strictEqual(state.payouts[0].hand, "straight");
+  assert.deepStrictEqual(state.payouts[0].cards.slice().sort(), ["Ah", "Jd", "Kh", "Qc", "Tc"]);
 });
 
 check("side pots pay the short all-in only the main pot", function () {

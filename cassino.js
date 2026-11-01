@@ -214,11 +214,25 @@
     return null;
   }
 
+  function cardLabel(card) {
+    return Poker.cardParts(card).text;
+  }
+
+  function combinationText(hand, cards) {
+    var name = HANDS[hand] || hand;
+    if (!hand) return "";
+    if (!cards || !cards.length) return name;
+    return name + ": " + cards.slice().sort(function (a, b) {
+      return rankValue(b) - rankValue(a);
+    }).map(cardLabel).join(" ");
+  }
+
   function formatEntry(entry) {
     var name = playerById(entry.playerId);
     var label = name ? name.name : entry.playerId;
     var suffix = entry.allIn ? " (all-in)" : "";
     var cards;
+    var combo;
     if (entry.kind === "blind") {
       return label + " posta " + (entry.blind === "sb" ? "o small blind" : "o big blind") + " de $" + entry.amount;
     }
@@ -230,15 +244,14 @@
       return label + " aumenta para $" + entry.to + suffix;
     }
     if (entry.kind === "board") {
-      cards = entry.cards.map(function (card) {
-        return Poker.cardParts(card).text;
-      });
+      cards = entry.cards.map(cardLabel);
       return { flop: "Flop", turn: "Turn", river: "River" }[entry.street] + ": " + cards.join(" ");
     }
-    if (entry.kind === "show") return label + " mostra " + (HANDS[entry.hand] || entry.hand);
+    if (entry.kind === "show") return label + " mostra " + combinationText(entry.hand, entry.cards);
     if (entry.kind === "win") {
       if (entry.refund) return label + " recebe $" + entry.amount + " de volta";
-      if (entry.hand) return label + " ganha $" + entry.amount + " com " + HANDS[entry.hand];
+      combo = combinationText(entry.hand, entry.cards);
+      if (combo) return label + " ganha $" + entry.amount + " com " + combo;
       return label + " ganha $" + entry.amount;
     }
     return "";
@@ -265,7 +278,7 @@
     document.getElementById("log").appendChild(item);
   }
 
-  function cardNode(card, faceDown) {
+  function cardNode(card, faceDown, used) {
     var node = document.createElement("span");
     var parts;
     var rank;
@@ -276,6 +289,7 @@
       node.setAttribute("aria-hidden", "true");
       return node;
     }
+    if (used) node.className += " made";
     parts = Poker.cardParts(card);
     if (parts.red) node.className += " red";
     rank = document.createElement("span");
@@ -299,16 +313,40 @@
     return parts.join(" · ");
   }
 
-  function renderSeat(player, index, opts) {
+  function handWinners() {
+    var map = {};
+    if (!state || !state.handOver || !state.payouts) return map;
+    state.payouts.forEach(function (payout) {
+      if (payout.amount > 0 && !payout.refund) map[payout.playerId] = payout;
+    });
+    return map;
+  }
+
+  function cardWasUsed(winners, card) {
+    var id;
+    var cards;
+    for (id in winners) {
+      if (!Object.prototype.hasOwnProperty.call(winners, id)) continue;
+      cards = winners[id].cards;
+      if (cards && cards.indexOf(card) !== -1) return true;
+    }
+    return false;
+  }
+
+  function renderSeat(player, index, opts, winners) {
     var className = "seat s" + index;
     var seat;
     var meta = [];
     var cards;
     var hidden;
+    var payout;
     var i;
     opts = opts || {};
+    winners = winners || {};
+    payout = winners[player.id];
     if (index === state.toAct) className += " acting";
     if (player.folded) className += " folded";
+    if (payout) className += " winner";
     seat = el("article", className);
     seat.appendChild(el("p", "seat-name", player.name));
     meta.push("$" + player.stack);
@@ -316,13 +354,22 @@
     if (player.allIn && !player.folded) meta.push("all-in");
     if (player.folded) meta.push("fora");
     seat.appendChild(el("p", "seat-meta", meta.join(" · ")));
+    if (payout) {
+      seat.appendChild(el(
+        "p",
+        "seat-result",
+        payout.hand ? "Ganhou com " + (HANDS[payout.hand] || payout.hand) : "Ganhou"
+      ));
+    }
     if (player.streetBet > 0 && !state.handOver) {
       seat.appendChild(el("p", "seat-bet", "Aposta $" + player.streetBet));
     }
     cards = el("div", "cards");
     if (!opts.hideHoles) {
       hidden = !player.isHuman && (player.folded || opts.coverShowdown || !state.revealed);
-      for (i = 0; i < player.hole.length; i += 1) cards.appendChild(cardNode(player.hole[i], hidden));
+      for (i = 0; i < player.hole.length; i += 1) {
+        cards.appendChild(cardNode(player.hole[i], hidden, !hidden && cardWasUsed(winners, player.hole[i])));
+      }
     }
     seat.appendChild(cards);
     return seat;
@@ -338,6 +385,7 @@
   function statusNode() {
     var node = el("p", "table-status", statusMessage);
     node.id = "status";
+    if (state && state.handOver) node.className += " result";
     node.setAttribute("aria-live", "polite");
     return node;
   }
@@ -533,13 +581,16 @@
     var table = document.getElementById("table");
     var board = el("section", "board-panel");
     var cards = el("div", "cards board-cards");
+    var winners = handWinners();
+    var faceDown;
     var i;
-    clear(table);
-    for (i = 0; i < state.players.length; i += 1) table.appendChild(renderSeat(state.players[i], i, opts));
     opts = opts || {};
+    clear(table);
+    for (i = 0; i < state.players.length; i += 1) table.appendChild(renderSeat(state.players[i], i, opts, winners));
     board.appendChild(el("p", "pot", "Pote $" + Poker.potSize(state)));
     for (i = 0; i < state.board.length; i += 1) {
-      cards.appendChild(cardNode(state.board[i], opts.boardDownFrom != null && i >= opts.boardDownFrom));
+      faceDown = opts.boardDownFrom != null && i >= opts.boardDownFrom;
+      cards.appendChild(cardNode(state.board[i], faceDown, !faceDown && cardWasUsed(winners, state.board[i])));
     }
     board.appendChild(cards);
     board.appendChild(el("p", "street-label", STREETS[state.street] || ""));
@@ -556,6 +607,8 @@
       if (!wins.length) return "Mão encerrada";
       return wins.map(function (payout) {
         var name = playerById(payout.playerId).name;
+        var combo = combinationText(payout.hand, payout.cards);
+        if (combo) return name + " ganha $" + payout.amount + " com " + combo;
         return name + " ganha $" + payout.amount;
       }).join(" · ");
     }
@@ -717,6 +770,7 @@
     handClosing = true;
     clearTimeout(timer);
     syncRoster();
+    render();
     showPlayAgain();
   }
 
@@ -884,25 +938,29 @@
   }
 
   function showPlayAgain() {
-    var board = document.querySelector("#table .board-panel");
+    var box = document.getElementById("actions");
     var raiseBox = document.getElementById("raise-box");
     var again;
-    clear(document.getElementById("actions"));
+    if (!box) return;
     if (raiseBox) raiseBox.remove();
-    document.documentElement.style.removeProperty("--dock-height");
-    if (!board) return;
-    clear(board);
+    clear(box);
     again = actionButton("Jogar de novo", playAgain);
     again.id = "play-again";
     again.className = "play-again";
-    board.appendChild(again);
+    box.appendChild(again);
+    keepHeroVisible();
   }
 
   function startHand() {
     var seated = 0;
+    var raiseBox = document.getElementById("raise-box");
+    var actions = document.getElementById("actions");
     shownBoard = 0;
     shownHoles = false;
     handClosing = false;
+    if (actions) clear(actions);
+    if (raiseBox) raiseBox.remove();
+    document.documentElement.style.removeProperty("--dock-height");
     roster.forEach(function (player) {
       if (player.stack > 0) seated += 1;
     });
