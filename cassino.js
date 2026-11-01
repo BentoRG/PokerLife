@@ -1,5 +1,6 @@
 (function () {
   var START = 500;
+  var BOT_STACK = 200;
   var SB = 5;
   var BB = 10;
   var BOT_PAUSE = 1700;
@@ -362,11 +363,11 @@
   function freshRoster() {
     roster = [
       { id: "hero", name: "Você", stack: heroMoney(), isHuman: true },
-      { id: "lia", name: "Bot 1", stack: START, isHuman: false },
-      { id: "caio", name: "Bot 2", stack: START, isHuman: false },
-      { id: "duda", name: "Bot 3", stack: START, isHuman: false },
-      { id: "ravi", name: "Bot 4", stack: START, isHuman: false },
-      { id: "nanda", name: "Bot 5", stack: START, isHuman: false },
+      { id: "lia", name: "Bot 1", stack: BOT_STACK, isHuman: false },
+      { id: "caio", name: "Bot 2", stack: BOT_STACK, isHuman: false },
+      { id: "duda", name: "Bot 3", stack: BOT_STACK, isHuman: false },
+      { id: "ravi", name: "Bot 4", stack: BOT_STACK, isHuman: false },
+      { id: "nanda", name: "Bot 5", stack: BOT_STACK, isHuman: false },
     ];
     button = roster.length - 1;
   }
@@ -843,7 +844,7 @@
     shownHoles = false;
     handClosing = false;
     roster.forEach(function (player) {
-      if (!player.isHuman && player.stack <= 0) player.stack = START;
+      if (!player.isHuman && player.stack <= 0) player.stack = BOT_STACK;
       if (player.stack > 0) seated += 1;
     });
     if (roster[0].stack <= 0 || seated < 2) {
