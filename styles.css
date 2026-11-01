@@ -273,11 +273,6 @@ main {
   color: #595959;
 }
 
-.allowance + .auth-block,
-.allowance + .mode-select {
-  margin-top: 1.15rem;
-}
-
 .table-main {
   padding-top: 1.4rem;
   padding-bottom: 2rem;
