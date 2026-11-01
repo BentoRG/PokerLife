@@ -60,7 +60,28 @@
     } catch (error) {}
   }
 
+  function grantBergGift() {
+    var accounts = readAccounts();
+    var changed = false;
+    var i;
+    var account;
+    for (i = 0; i < accounts.length; i += 1) {
+      account = accounts[i];
+      if (!account || typeof account.username !== "string") continue;
+      if (account.username.trim().toLowerCase() !== "berg") continue;
+      if (account.gift50) continue;
+      account.money = accountMoney(account) + 50;
+      account.gift50 = true;
+      changed = true;
+    }
+    if (!changed) return;
+    try {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (error) {}
+  }
+
   applyOpeningCut();
+  grantBergGift();
 
   function currentUser() {
     try {
