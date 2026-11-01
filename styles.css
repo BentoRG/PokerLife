@@ -593,39 +593,144 @@ main {
 }
 
 @media (max-width: 640px) {
+  html {
+    text-size-adjust: 100%;
+  }
+
+  .site-header {
+    padding: 0.85rem 0.9rem 0;
+  }
+
   .site-header h1,
   .welcome {
-    font-size: 2rem;
+    font-size: 1.55rem;
   }
 
   .subtitle {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
   }
 
   main {
-    padding-top: 2.75rem;
+    padding: 1.15rem 0.9rem 1.5rem;
   }
 
   .login-header {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 0.75rem;
   }
 
   .login-title {
+    width: auto;
+    flex: 0 0 auto;
+    font-size: 1.35rem;
+    line-height: 1.1;
+    text-align: right;
+  }
+
+  .home-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.45rem;
+    padding: 0.85rem 0.9rem 0;
+  }
+
+  .home-header .brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .home-header .login-title {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+  }
+
+  .home-header .welcome {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .home-header .subtitle {
+    max-width: 10.5rem;
+  }
+
+  .home-header + main,
+  .login-main {
+    padding-top: 1rem;
+  }
+
+  .table-main {
+    padding-top: 0.55rem;
+  }
+
+  .balance,
+  .allowance,
+  .allowance-claim,
+  .story,
+  .menu,
+  .auth-block,
+  .mode-select,
+  .felt,
+  .controls,
+  .hand-log {
     width: 100%;
-    font-size: 2rem;
+    max-width: 100%;
+  }
+
+  .allowance-claim {
+    overflow-wrap: anywhere;
+  }
+
+  .story {
+    font-size: 1.08rem;
+    line-height: 1.3;
+  }
+
+  .menu {
+    aspect-ratio: auto;
+    min-height: 4.6rem;
+  }
+
+  .menu button,
+  .menu a {
+    min-height: 4.6rem;
+    padding: 0.65rem 0.35rem;
+    font-size: 1rem;
+  }
+
+  .auth-block + .auth-block {
+    margin-top: 1.45rem;
+  }
+
+  .field-stack input,
+  .field-stack button {
+    padding: 0.7rem 0.6rem;
+    font-size: 1.05rem;
+  }
+
+  .mode-select {
+    margin-top: 1.15rem;
+    gap: 0.7rem;
+  }
+
+  .mode-select button {
+    padding: 0.8rem 0.65rem;
+    font-size: 1.05rem;
+  }
+
+  .table-nav {
+    align-self: stretch;
+    max-width: 100%;
+    margin-top: 0.85rem;
     text-align: right;
   }
 
   .table-nav a {
-    font-size: 2rem;
-  }
-
-  .board-panel {
-    margin: 0.7rem 0;
-  }
-
-  .login-main {
-    padding-top: 2rem;
+    font-size: 1.25rem;
   }
 
   .felt {
@@ -636,13 +741,75 @@ main {
       "board board"
       "s1 s1"
       "s0 s0";
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+  }
+
+  .seat {
+    padding: 0.28rem 0.25rem 0.32rem;
+  }
+
+  .seat-name,
+  .pot {
+    font-size: 0.98rem;
+    overflow-wrap: anywhere;
+  }
+
+  .seat-meta,
+  .seat-bet,
+  .street-label {
+    display: inline;
+    margin-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .seat-bet::before {
+    content: " · ";
+  }
+
+  .board-panel {
+    min-height: 0;
+    margin: 0.1rem 0;
+    padding: 0.4rem 0.35rem 0.35rem;
+  }
+
+  .cards {
+    gap: 0.18rem;
+    margin-top: 0.22rem;
   }
 
   .card,
   .board-cards .card {
-    width: 2.15rem;
-    height: 3.05rem;
-    font-size: 0.95rem;
+    width: 1.7rem;
+    height: 2.35rem;
+    font-size: 0.78rem;
+  }
+
+  .board-cards {
+    min-height: 2.35rem;
+  }
+
+  .board-cards:empty {
+    min-height: 0;
+    margin-top: 0;
+  }
+
+  .s0 {
+    scroll-margin-bottom: calc(var(--dock-height, 0px) + 0.7rem);
+  }
+
+  .hand-log {
+    max-height: 6.5rem;
+    margin-top: 0.7rem;
+    font-size: 0.92rem;
+  }
+
+  .actions button,
+  .raise-box button,
+  .raise-box input {
+    min-height: 2.75rem;
+    padding: 0.65rem 0.35rem;
+    font-size: 0.98rem;
   }
 
   .controls:has(button:not([hidden])) {
@@ -654,7 +821,7 @@ main {
     width: auto;
     flex-direction: column-reverse;
     align-items: stretch;
-    padding: 0.35rem 0.6rem 0.5rem;
+    padding: 0.35rem 0.6rem calc(0.5rem + env(safe-area-inset-bottom));
     background: #d2b35c;
   }
 
@@ -669,10 +836,11 @@ main {
   }
 
   .table-main:has(.controls button:not([hidden])) {
-    padding-bottom: 8rem;
+    padding-bottom: calc(var(--dock-height, 7.5rem) + 3.2rem + env(safe-area-inset-bottom));
   }
 
-  .table-main:has(#raise-box) {
-    padding-bottom: 13rem;
+  .hand-log,
+  .table-nav {
+    scroll-margin-bottom: calc(var(--dock-height, 0px) + 0.7rem);
   }
 }

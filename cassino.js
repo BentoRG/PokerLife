@@ -612,6 +612,7 @@
     box.appendChild(actionButton("Confirmar", confirm));
     box.appendChild(error);
     document.getElementById("actions").insertAdjacentElement("afterend", box);
+    keepHeroVisible();
   }
 
   function renderActions() {
@@ -646,12 +647,30 @@
     }
   }
 
+  function keepHeroVisible() {
+    var hero = document.querySelector(".s0");
+    var controls = document.querySelector(".controls");
+    var dock;
+    var rect;
+    var limit;
+    if (!hero || !controls || !controls.querySelector("button")) {
+      document.documentElement.style.removeProperty("--dock-height");
+      return;
+    }
+    dock = Math.ceil(controls.getBoundingClientRect().height);
+    document.documentElement.style.setProperty("--dock-height", dock + "px");
+    rect = hero.getBoundingClientRect();
+    limit = window.innerHeight - dock - 8;
+    if (rect.bottom > limit) hero.scrollIntoView({ block: "end", inline: "nearest" });
+  }
+
   function render() {
     if (!state) return;
     setStatus(statusText());
     renderTable();
     renderActions();
     syncLog();
+    keepHeroVisible();
   }
 
   function syncRoster() {
@@ -849,6 +868,7 @@
   function init() {
     document.getElementById("play-bots").addEventListener("click", startMatch);
     document.getElementById("play-friends").addEventListener("click", showUnavailable);
+    window.addEventListener("resize", keepHeroVisible);
     showModeSelect();
   }
 
