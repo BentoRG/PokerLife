@@ -14,61 +14,55 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="site-header home-header">
+    <header class="site-header login-header">
       <div class="brand">
         <h1>PokerLife</h1>
         <p class="subtitle">A vida até o que um herdeiro conhece</p>
       </div>
-      <p class="welcome">Bem-Vindo, <span class="welcome-name"></span></p>
-      <p class="login-title">Sua conta</p>
+      <p class="login-title">Sua Conta</p>
     </header>
 
-    <main>
-      <form id="password-form" class="auth-block">
-        <h2 class="auth-heading">Mudar a senha</h2>
-        <div class="field-stack">
-          <input
-            type="password"
-            name="current"
-            autocomplete="current-password"
-            placeholder="Senha antiga"
-            required
-          />
-          <input
-            type="password"
-            name="password"
-            autocomplete="new-password"
-            placeholder="Senha nova"
-            required
-          />
-          <input
-            type="password"
-            name="confirm"
-            autocomplete="new-password"
-            placeholder="Confirmar senha nova"
-            required
-          />
-          <button type="submit">Mudar</button>
-        </div>
-        <p class="form-error" role="alert" hidden></p>
-      </form>
+    <main class="table-main">
+      <section class="account-card">
+        <p>Nome de usuário: <span class="account-username"></span></p>
+        <p>
+          Email: <span class="account-email"></span>
+          <button type="button" class="email-change" id="change-email">(trocar email)</button>
+        </p>
+        <form id="email-form" class="email-swap" hidden>
+          <div class="field-stack">
+            <input type="email" name="email" autocomplete="email" placeholder="Email novo" required />
+            <button type="submit">Mudar</button>
+          </div>
+          <p class="form-error" role="alert" hidden></p>
+        </form>
 
-      <form id="email-form" class="auth-block">
-        <h2 class="auth-heading">Mudar o email</h2>
-        <div class="field-stack">
-          <input
-            type="email"
-            name="email"
-            autocomplete="email"
-            placeholder="Email novo"
-            required
-          />
-          <button type="submit">Mudar</button>
-        </div>
-        <p class="form-error" role="alert" hidden></p>
-      </form>
+        <h2>Itens colecionados:</h2>
+        <ul>
+          <li>Asdf</li>
+          <li>Asdf</li>
+          <li>asdf</li>
+        </ul>
 
-      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
+        <p class="account-money-line">Dinheiro: <span class="account-money"></span></p>
+        <p>Mesada: <span class="account-mesada"></span></p>
+
+        <h2>Registro bancário:</h2>
+        <p class="ledger">+$50 → partida de poker</p>
+        <p>-$40 → compra do item asdf</p>
+        <p>+$100 → mesada do dia</p>
+        <p>30/10/2026</p>
+      </section>
+
+      <p class="table-nav"><a href="index.html">Voltar à<br />página inicial</a></p>
     </main>
+
+    <script>
+      document.getElementById("change-email").addEventListener("click", function () {
+        var form = document.getElementById("email-form");
+        form.hidden = false;
+        form.querySelector("input").focus();
+      });
+    </script>
   </body>
 </html>

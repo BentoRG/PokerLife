@@ -314,6 +314,7 @@
     if (profile && name) profile.textContent = name;
     paintBalance();
     paintAllowance();
+    paintProfile();
     if (button && !button.dataset.bound) {
       button.dataset.bound = "1";
       button.addEventListener("click", function () {
@@ -326,6 +327,18 @@
       allowanceTicking = true;
       window.setInterval(paintAllowance, 1000);
     }
+  }
+
+  function paintProfile() {
+    var account = findAccount(currentUser() || "");
+    var user = document.querySelector(".account-username");
+    var email = document.querySelector(".account-email");
+    var money = document.querySelector(".account-money");
+    var mesada = document.querySelector(".account-mesada");
+    if (user) user.textContent = currentUser() || "";
+    if (email) email.textContent = account && account.email ? account.email : "";
+    if (money) money.textContent = "$" + currentMoney();
+    if (mesada) mesada.textContent = "$" + allowanceAmount(Date.now());
   }
 
   function changePassword(current, next, confirm) {
@@ -414,6 +427,7 @@
         }
         emailForm.reset();
         showFormMessage(emailForm, "Email alterado.", true);
+        paintProfile();
       });
     }
   }
