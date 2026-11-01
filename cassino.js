@@ -135,26 +135,55 @@
     return clamp(raw, legal.minRaiseTo, legal.maxRaiseTo);
   }
 
+  // Bot 2 is the only strong player. Bots 1 and 3 are weak, and Bot 4 is in between.
+  var SKILL = {
+    lia: 4,
+    caio: 9,
+    duda: 4,
+    ravi: 7,
+  };
+
+  function skillOf(player) {
+    var skill = SKILL[player.id];
+    return skill == null ? 5 : skill;
+  }
+
   function chooseBot(table) {
     var legal = Poker.legalActions(table);
     var player = table.players[table.toAct];
-    var score = clamp(strength(player, table) + (Math.random() - 0.5) * 0.1, 0, 1);
+    var skill = skillOf(player);
+    var error = (10 - skill) / 10;
+    var trueScore = strength(player, table);
+    var score = clamp(trueScore + (Math.random() - 0.5) * error * 0.9, 0, 1);
     var pot = Poker.potSize(table);
-    var odds = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
+    var price = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
+    var size = skill >= 9 ? 1 : skill >= 7 ? 0.66 : 0.4;
+    var valueAt = skill >= 9 ? 0.62 : skill >= 7 ? 0.72 : 0.84;
     if (legal.call > 0) {
-      if (score >= 0.8 && legal.minRaiseTo != null && Math.random() < 0.75) {
-        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.5 : 1) };
+      if (score >= valueAt && legal.minRaiseTo != null && Math.random() < 0.92 - error * 0.55) {
+        return { type: "raise", to: sizedBet(table, legal, size) };
       }
-      if (score >= 0.58 && legal.minRaiseTo != null && Math.random() < 0.35) {
-        return { type: "raise", to: sizedBet(table, legal, 0.5) };
+      if (
+        legal.minRaiseTo != null &&
+        score < 0.72 &&
+        Math.random() < (skill >= 9 ? 0.05 : error * 0.22) &&
+        (skill < 9 || score >= 0.34)
+      ) {
+        return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.66 : Math.random() < 0.5 ? 0.25 : 1.25) };
       }
-      if (score >= odds && score >= 0.28) return { type: "call" };
-      if (score >= 0.22 && odds <= 0.22) return { type: "call" };
-      if (Math.random() < 0.06 && legal.minRaiseTo != null) return { type: "raise", to: sizedBet(table, legal, 0.5) };
-      return { type: "fold" };
+      if (score + error * 0.28 >= price && score >= 0.2 - error * 0.18) return { type: "call" };
+      if (Math.random() < error * 0.38) return { type: "call" };
+      if (trueScore >= 0.8 && Math.random() < error * 0.22) return { type: "fold" };
+      return legal.fold ? { type: "fold" } : { type: "call" };
     }
-    if (legal.minRaiseTo != null && (score >= 0.64 || (score >= 0.36 && Math.random() < 0.45) || Math.random() < 0.07)) {
-      return { type: "raise", to: sizedBet(table, legal, score >= 0.82 ? 1 : 0.5) };
+    if (legal.minRaiseTo != null && score >= valueAt && Math.random() < 0.94 - error * 0.5) {
+      return { type: "raise", to: sizedBet(table, legal, size) };
+    }
+    if (legal.minRaiseTo != null && score >= 0.48 && Math.random() < 0.42 - error * 0.28) {
+      return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.55 : 0.4) };
+    }
+    if (legal.minRaiseTo != null && Math.random() < 0.05 + error * 0.18 && (skill < 9 || score >= 0.32)) {
+      return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.66 : 0.35) };
     }
     if (legal.check) return { type: "check" };
     if (legal.fold) return { type: "fold" };
