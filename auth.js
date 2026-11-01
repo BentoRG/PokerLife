@@ -35,7 +35,7 @@
 
   function currentUser() {
     try {
-      var name = localStorage.getItem(SESSION_KEY);
+      var name = sessionStorage.getItem(SESSION_KEY);
       return name && name.trim() ? name : null;
     } catch (error) {
       return null;
@@ -55,9 +55,33 @@
   }
 
   function remember(username) {
-    localStorage.setItem(SESSION_KEY, username);
+    sessionStorage.setItem(SESSION_KEY, username);
     location.replace(destination());
   }
+
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch (error) {}
+
+  function endVisitIfLeaving(url) {
+    try {
+      if (new URL(url, location.href).origin !== location.origin) {
+        sessionStorage.removeItem(SESSION_KEY);
+      }
+    } catch (error) {}
+  }
+
+  if (window.navigation && typeof navigation.addEventListener === "function") {
+    navigation.addEventListener("navigate", function (event) {
+      var destinationUrl = event.destination && event.destination.url;
+      if (destinationUrl) endVisitIfLeaving(destinationUrl);
+    });
+  }
+
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted || isLoginPage() || currentUser()) return;
+    location.replace("login.html?next=" + encodeURIComponent(safeNext(pageName())));
+  });
 
   function signIn(username, password) {
     var account = findAccount(username);
