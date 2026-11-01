@@ -3,9 +3,9 @@
   var SESSION_KEY = "pokerlife.session";
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
-  var ALLOWANCE = 50;
+  var ALLOWANCE = 100;
   var ALLOWANCE_HOUR = 7;
-  // 25 Oct 2026 is the last Sunday the mesada stays at $50.
+  // 25 Oct 2026 is the last Sunday the mesada stays at $100.
   // Each later Sunday at 7:00 doubles it for the week that follows.
   var ALLOWANCE_ANCHOR = new Date(2026, 9, 25);
 
