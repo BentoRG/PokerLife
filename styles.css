@@ -77,6 +77,27 @@ main {
   text-underline-offset: 0.18em;
 }
 
+.allowance-claim {
+  margin-top: 0.7rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid #000;
+  background: #eee;
+  color: #000;
+  font-family: inherit;
+  font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.allowance-claim:hover {
+  background: #e4e4e4;
+}
+
+.allowance-claim:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: 2px;
+}
+
 .menu {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

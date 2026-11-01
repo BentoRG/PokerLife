@@ -2,6 +2,8 @@
   var ACCOUNTS_KEY = "pokerlife.accounts";
   var SESSION_KEY = "pokerlife.session";
   var STARTING_MONEY = 500;
+  var ALLOWANCE = 50;
+  var ALLOWANCE_HOUR = 7;
 
   function pageName() {
     var name = location.pathname.split("/").pop();
@@ -149,23 +151,75 @@
     return accountMoney(findAccount(name));
   }
 
-  function setMoney(amount) {
+  function updateAccount(mutator) {
     var name = currentUser();
-    var next = Math.round(Number(amount));
     var accounts;
     var i;
     var account;
-    if (!name || !isFinite(next)) return;
-    next = Math.max(0, next);
+    if (!name) return null;
     accounts = readAccounts();
     for (i = 0; i < accounts.length; i += 1) {
       account = accounts[i];
       if (!account || typeof account.username !== "string") continue;
       if (account.username.toLowerCase() !== name.toLowerCase()) continue;
-      account.money = next;
+      mutator(account);
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-      return;
+      return account;
     }
+    return null;
+  }
+
+  function setMoney(amount) {
+    var next = Math.round(Number(amount));
+    if (!isFinite(next)) return;
+    next = Math.max(0, next);
+    updateAccount(function (account) {
+      account.money = next;
+    });
+  }
+
+  function allowanceWindowStart(now) {
+    var date = new Date(now);
+    var start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), ALLOWANCE_HOUR, 0, 0, 0);
+    if (date < start) start.setDate(start.getDate() - 1);
+    return start.getTime();
+  }
+
+  function nextAllowanceAt(now) {
+    var next = new Date(allowanceWindowStart(now));
+    next.setDate(next.getDate() + 1);
+    return next.getTime();
+  }
+
+  function allowanceReady(now) {
+    var account = findAccount(currentUser() || "");
+    var claimed = account && account.allowanceClaimedWindow;
+    if (typeof claimed !== "number" || !isFinite(claimed)) return true;
+    return claimed !== allowanceWindowStart(now);
+  }
+
+  function claimAllowance() {
+    var now = Date.now();
+    var windowStart = allowanceWindowStart(now);
+    var claimed = false;
+    updateAccount(function (account) {
+      if (account.allowanceClaimedWindow === windowStart) return;
+      account.money = accountMoney(account) + ALLOWANCE;
+      account.allowanceClaimedWindow = windowStart;
+      claimed = true;
+    });
+    return claimed;
+  }
+
+  function formatRemaining(ms) {
+    var total = Math.max(0, Math.ceil(ms / 1000));
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var seconds = total % 60;
+    function pad(value) {
+      return (value < 10 ? "0" : "") + value;
+    }
+    return pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
   }
 
   function paintBalance() {
@@ -174,13 +228,42 @@
     node.textContent = "Você tem $" + currentMoney();
   }
 
+  function paintAllowance() {
+    var waiting = document.querySelector(".allowance-waiting");
+    var ready = document.querySelector(".allowance-ready");
+    var countdown = document.querySelector(".countdown");
+    var button = document.querySelector(".allowance-claim");
+    var now;
+    var available;
+    if (!waiting || !ready || !button) return;
+    now = Date.now();
+    available = allowanceReady(now);
+    waiting.hidden = available;
+    ready.hidden = !available;
+    button.hidden = !available;
+    if (!available && countdown) {
+      countdown.textContent = formatRemaining(nextAllowanceAt(now) - now);
+    }
+  }
+
   function paintAccount() {
     var name = currentUser();
     var welcome = document.querySelector(".welcome-name");
     var profile = document.querySelector(".profile-name");
+    var button = document.querySelector(".allowance-claim");
     if (welcome && name) welcome.textContent = name;
     if (profile && name) profile.textContent = name;
     paintBalance();
+    paintAllowance();
+    if (button && !button.dataset.bound) {
+      button.dataset.bound = "1";
+      button.addEventListener("click", function () {
+        if (!claimAllowance()) return;
+        paintBalance();
+        paintAllowance();
+      });
+      window.setInterval(paintAllowance, 1000);
+    }
   }
 
   window.PokerLifeAuth = {
