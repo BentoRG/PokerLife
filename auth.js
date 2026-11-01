@@ -4,6 +4,9 @@
   var STARTING_MONEY = 500;
   var ALLOWANCE = 50;
   var ALLOWANCE_HOUR = 7;
+  // 25 Oct 2026 is the last Sunday the mesada stays at $50.
+  // Each later Sunday at 7:00 doubles it for the week that follows.
+  var ALLOWANCE_ANCHOR = new Date(2026, 9, 25);
 
   function pageName() {
     var name = location.pathname.split("/").pop();
@@ -191,6 +194,27 @@
     return next.getTime();
   }
 
+  function allowanceDoublings(now) {
+    var start = new Date(allowanceWindowStart(now));
+    var days = Math.round(
+      (Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()) -
+        Date.UTC(
+          ALLOWANCE_ANCHOR.getFullYear(),
+          ALLOWANCE_ANCHOR.getMonth(),
+          ALLOWANCE_ANCHOR.getDate()
+        )) /
+        86400000
+    );
+    var weeks = Math.floor(days / 7);
+    if (weeks < 0) return 0;
+    if (weeks > 46) return 46;
+    return weeks;
+  }
+
+  function allowanceAmount(now) {
+    return ALLOWANCE * Math.pow(2, allowanceDoublings(now));
+  }
+
   function allowanceReady(now) {
     var account = findAccount(currentUser() || "");
     var claimed = account && account.allowanceClaimedWindow;
@@ -204,7 +228,7 @@
     var claimed = false;
     updateAccount(function (account) {
       if (account.allowanceClaimedWindow === windowStart) return;
-      account.money = accountMoney(account) + ALLOWANCE;
+      account.money = accountMoney(account) + allowanceAmount(now);
       account.allowanceClaimedWindow = windowStart;
       claimed = true;
     });
@@ -220,6 +244,13 @@
       return (value < 10 ? "0" : "") + value;
     }
     return pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
+  }
+
+  function paintAllowanceAmount(amount) {
+    var nodes = document.querySelectorAll(".allowance-amount");
+    var label = "$" + amount;
+    var i;
+    for (i = 0; i < nodes.length; i += 1) nodes[i].textContent = label;
   }
 
   function paintBalance() {
@@ -241,6 +272,7 @@
     waiting.hidden = available;
     ready.hidden = !available;
     button.hidden = !available;
+    paintAllowanceAmount(available ? allowanceAmount(now) : allowanceAmount(nextAllowanceAt(now)));
     if (!available && countdown) {
       countdown.textContent = formatRemaining(nextAllowanceAt(now) - now);
     }
