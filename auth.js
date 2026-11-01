@@ -1,7 +1,8 @@
 (function () {
   var ACCOUNTS_KEY = "pokerlife.accounts";
   var SESSION_KEY = "pokerlife.session";
-  var STARTING_MONEY = 500;
+  var STARTING_MONEY = 150;
+  var OPENING_CUT = 350;
   var ALLOWANCE = 50;
   var ALLOWANCE_HOUR = 7;
   // 25 Oct 2026 is the last Sunday the mesada stays at $50.
@@ -37,6 +38,29 @@
       return [];
     }
   }
+
+  function applyOpeningCut() {
+    var accounts = readAccounts();
+    var changed = false;
+    var i;
+    var account;
+    var money;
+    for (i = 0; i < accounts.length; i += 1) {
+      account = accounts[i];
+      if (!account || typeof account !== "object" || account.openingCutApplied) continue;
+      money = account.money;
+      if (typeof money !== "number" || !isFinite(money)) money = STARTING_MONEY + OPENING_CUT;
+      account.money = Math.max(0, Math.round(money) - OPENING_CUT);
+      account.openingCutApplied = true;
+      changed = true;
+    }
+    if (!changed) return;
+    try {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (error) {}
+  }
+
+  applyOpeningCut();
 
   function currentUser() {
     try {
@@ -131,6 +155,7 @@
       password: password,
       email: trimmedEmail,
       money: STARTING_MONEY,
+      openingCutApplied: true,
     });
 
     try {
