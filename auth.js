@@ -267,6 +267,15 @@
     return ALLOWANCE * Math.pow(2, allowanceDoublings(now));
   }
 
+  function sundayAllowanceAmount(now) {
+    var start = new Date(allowanceWindowStart(now));
+    var daysUntilSunday = (7 - start.getDay()) % 7;
+    var sunday;
+    if (daysUntilSunday === 0) daysUntilSunday = 7;
+    sunday = new Date(start.getFullYear(), start.getMonth(), start.getDate() + daysUntilSunday, ALLOWANCE_HOUR, 0, 0, 0);
+    return allowanceAmount(sunday.getTime());
+  }
+
   function allowanceReady(now) {
     var account = findAccount(currentUser() || "");
     var claimed = account && account.allowanceClaimedWindow;
@@ -365,7 +374,10 @@
     if (user) user.textContent = currentUser() || "";
     if (email) email.textContent = account && account.email ? account.email : "";
     if (money) money.textContent = "$" + currentMoney();
-    if (mesada) mesada.textContent = "$" + allowanceAmount(Date.now());
+    if (mesada) {
+      var now = Date.now();
+      mesada.textContent = "$" + allowanceAmount(now) + " ($" + sundayAllowanceAmount(now) + " nos Domingos)";
+    }
   }
 
   function changePassword(current, next, confirm) {
