@@ -5,7 +5,6 @@
   var BB = 10;
   var BOT_PAUSE = 1700;
   var STREET_PAUSE = 2000;
-  var HAND_PAUSE = 3600;
   var DEAL_TRAVEL = 640;
   var REVEAL_OUT = 460;
   var REVEAL_IN = 560;
@@ -687,8 +686,9 @@
   function finishHand() {
     if (handClosing) return;
     handClosing = true;
+    clearTimeout(timer);
     syncRoster();
-    later(showModeSelect, HAND_PAUSE);
+    showPlayAgain();
   }
 
   function presentBoard(done) {
@@ -837,13 +837,44 @@
     continueHand();
   }
 
+  function advanceButton() {
+    var i;
+    var index;
+    for (i = 1; i <= roster.length; i += 1) {
+      index = (button + i) % roster.length;
+      if (roster[index].stack > 0) {
+        button = index;
+        return;
+      }
+    }
+  }
+
+  function playAgain() {
+    advanceButton();
+    startHand();
+  }
+
+  function showPlayAgain() {
+    var board = document.querySelector("#table .board-panel");
+    var raiseBox = document.getElementById("raise-box");
+    var again;
+    clear(document.getElementById("actions"));
+    if (raiseBox) raiseBox.remove();
+    document.documentElement.style.removeProperty("--dock-height");
+    if (!board) return;
+    clear(board);
+    again = actionButton("Jogar de novo", playAgain);
+    again.id = "play-again";
+    again.className = "play-again";
+    board.appendChild(again);
+  }
+
   function startHand() {
     var seated = 0;
     shownBoard = 0;
     shownHoles = false;
     handClosing = false;
     roster.forEach(function (player) {
-      if (!player.isHuman && player.stack <= 0) player.stack = BOT_STACK;
       if (player.stack > 0) seated += 1;
     });
     if (roster[0].stack <= 0 || seated < 2) {

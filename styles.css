@@ -355,6 +355,36 @@ main {
   margin: 0.35rem 0;
 }
 
+.board-panel:has(.play-again) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play-again {
+  width: min(28rem, 100%);
+  margin: 0;
+  padding: 0.85rem 0.7rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font-family: inherit;
+  font-size: 1.2rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.play-again:hover {
+  background: #f3f3f3;
+}
+
+.play-again:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: -4px;
+  background: #f3f3f3;
+}
+
 .seat.acting {
   background: #f4efe0;
   outline: 2px solid #595959;
@@ -769,6 +799,15 @@ main {
     min-height: 0;
     margin: 0.1rem 0;
     padding: 0.4rem 0.35rem 0.35rem;
+  }
+
+  .board-panel:has(.play-again) {
+    min-height: 7.5rem;
+  }
+
+  .play-again {
+    padding: 0.8rem 0.65rem;
+    font-size: 1.05rem;
   }
 
   .cards {
