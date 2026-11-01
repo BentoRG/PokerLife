@@ -367,7 +367,6 @@
       { id: "caio", name: "Bot 2", stack: BOT_STACK, isHuman: false },
       { id: "duda", name: "Bot 3", stack: BOT_STACK, isHuman: false },
       { id: "ravi", name: "Bot 4", stack: BOT_STACK, isHuman: false },
-      { id: "nanda", name: "Bot 5", stack: BOT_STACK, isHuman: false },
     ];
     button = roster.length - 1;
   }

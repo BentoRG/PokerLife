@@ -316,11 +316,11 @@ main {
 
 .felt {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.9fr) minmax(0, 0.9fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-areas:
-    "s2 s3 s4"
-    "s1 board s5"
-    "s0 s0 s0";
+    "s1 s2 s3 s4"
+    "board board board board"
+    "s0 s0 s0 s0";
   gap: 0.75rem;
   margin-top: 0.9rem;
   align-items: center;
@@ -342,7 +342,6 @@ main {
 .s2 { grid-area: s2; }
 .s3 { grid-area: s3; }
 .s4 { grid-area: s4; }
-.s5 { grid-area: s5; }
 
 .s0 {
   justify-self: center;
@@ -353,7 +352,7 @@ main {
   grid-area: board;
   padding: 0.8rem 0.65rem 0.7rem;
   min-height: 12rem;
-  margin: 0.7rem 0.9rem;
+  margin: 0.35rem 0;
 }
 
 .seat.acting {
@@ -736,10 +735,9 @@ main {
   .felt {
     grid-template-columns: 1fr 1fr;
     grid-template-areas:
-      "s2 s3"
-      "s4 s5"
+      "s1 s2"
+      "s3 s4"
       "board board"
-      "s1 s1"
       "s0 s0";
     gap: 0.3rem;
     margin-top: 0.3rem;
