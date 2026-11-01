@@ -69,10 +69,16 @@
       account = accounts[i];
       if (!account || typeof account.username !== "string") continue;
       if (account.username.trim().toLowerCase() !== "berg") continue;
-      if (account.gift50) continue;
-      account.money = accountMoney(account) + 50;
-      account.gift50 = true;
-      changed = true;
+      if (!account.gift50) {
+        account.money = accountMoney(account) + 50;
+        account.gift50 = true;
+        changed = true;
+      }
+      if (!account.gift150) {
+        account.money = accountMoney(account) + 150;
+        account.gift150 = true;
+        changed = true;
+      }
     }
     if (!changed) return;
     try {
