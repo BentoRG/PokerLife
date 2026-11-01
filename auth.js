@@ -291,17 +291,19 @@
     var button = document.querySelector(".allowance-claim");
     var now;
     var available;
-    if (!waiting || !ready || !button) return;
+    if (!waiting || !ready) return;
     now = Date.now();
     available = allowanceReady(now);
     waiting.hidden = available;
     ready.hidden = !available;
-    button.hidden = !available;
+    if (button) button.hidden = !available;
     paintAllowanceAmount(available ? allowanceAmount(now) : allowanceAmount(nextAllowanceAt(now)));
     if (!available && countdown) {
       countdown.textContent = formatRemaining(nextAllowanceAt(now) - now);
     }
   }
+
+  var allowanceTicking = false;
 
   function paintAccount() {
     var name = currentUser();
@@ -319,18 +321,59 @@
         paintBalance();
         paintAllowance();
       });
+    }
+    if (!allowanceTicking && document.querySelector(".allowance")) {
+      allowanceTicking = true;
       window.setInterval(paintAllowance, 1000);
     }
   }
 
-  window.PokerLifeAuth = {
-    currentMoney: currentMoney,
-    setMoney: setMoney,
-  };
+  function changePassword(current, next, confirm) {
+    var account = findAccount(currentUser() || "");
+    if (!current || !next || !confirm) return "Preencha todos os campos.";
+    if (!account || account.password !== current) return "Senha antiga incorreta.";
+    if (next !== confirm) return "As senhas não coincidem.";
+    try {
+      if (!updateAccount(function (record) {
+        record.password = next;
+      })) return "Não foi possível salvar a conta neste navegador.";
+    } catch (error) {
+      return "Não foi possível salvar a conta neste navegador.";
+    }
+    return null;
+  }
 
-  function showError(form, message) {
+  function changeEmail(email) {
+    var trimmed = email.trim();
+    var name = currentUser();
+    var accounts;
+    var i;
+    var existing;
+    var emailKey;
+    if (!trimmed) return "Preencha todos os campos.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Informe um email válido.";
+    emailKey = trimmed.toLowerCase();
+    accounts = readAccounts();
+    for (i = 0; i < accounts.length; i += 1) {
+      existing = accounts[i];
+      if (!existing || typeof existing !== "object") continue;
+      if (name && String(existing.username || "").toLowerCase() === name.toLowerCase()) continue;
+      if (String(existing.email || "").toLowerCase() === emailKey) return "Esse email já está em uso.";
+    }
+    try {
+      if (!updateAccount(function (account) {
+        account.email = trimmed;
+      })) return "Não foi possível salvar a conta neste navegador.";
+    } catch (error) {
+      return "Não foi possível salvar a conta neste navegador.";
+    }
+    return null;
+  }
+
+  function showFormMessage(form, message, success) {
     var el = form.querySelector(".form-error");
     if (!el) return;
+    el.classList.toggle("form-success", !!success);
     if (!message) {
       el.hidden = true;
       el.textContent = "";
@@ -340,9 +383,58 @@
     el.textContent = message;
   }
 
+  function bindAccountForms() {
+    var passwordForm = document.querySelector("#password-form");
+    var emailForm = document.querySelector("#email-form");
+    if (passwordForm) {
+      passwordForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var data = new FormData(passwordForm);
+        var message = changePassword(
+          String(data.get("current") || ""),
+          String(data.get("password") || ""),
+          String(data.get("confirm") || "")
+        );
+        if (message) {
+          showFormMessage(passwordForm, message, false);
+          return;
+        }
+        passwordForm.reset();
+        showFormMessage(passwordForm, "Senha alterada.", true);
+      });
+    }
+    if (emailForm) {
+      emailForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var data = new FormData(emailForm);
+        var message = changeEmail(String(data.get("email") || ""));
+        if (message) {
+          showFormMessage(emailForm, message, false);
+          return;
+        }
+        emailForm.reset();
+        showFormMessage(emailForm, "Email alterado.", true);
+      });
+    }
+  }
+
+  window.PokerLifeAuth = {
+    currentMoney: currentMoney,
+    setMoney: setMoney,
+  };
+
+  function showError(form, message) {
+    showFormMessage(form, message, false);
+  }
+
   if (!isLoginPage() && currentUser()) {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", paintAccount);
-    else paintAccount();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", paintAccount);
+      document.addEventListener("DOMContentLoaded", bindAccountForms);
+    } else {
+      paintAccount();
+      bindAccountForms();
+    }
   }
 
   if (!isLoginPage() && !currentUser()) {

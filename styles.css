@@ -269,6 +269,15 @@ main {
   line-height: 1.35;
 }
 
+.form-error.form-success {
+  color: #595959;
+}
+
+.allowance + .auth-block,
+.allowance + .mode-select {
+  margin-top: 1.15rem;
+}
+
 .table-main {
   padding-top: 1.4rem;
   padding-bottom: 2rem;
@@ -542,6 +551,10 @@ main {
   line-height: 1.25;
   text-align: center;
   cursor: pointer;
+}
+
+.mode-select button:hover {
+  background: #f3f3f3;
 }
 
 #play-bots:hover {

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="auth.js"></script>
+    <title>Sua conta — PokerLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header home-header">
+      <div class="brand">
+        <h1>PokerLife</h1>
+        <p class="subtitle">A vida até o que um herdeiro conhece</p>
+      </div>
+      <p class="welcome">Bem-Vindo, <span class="welcome-name"></span></p>
+      <p class="login-title">Sua conta</p>
+    </header>
+
+    <main>
+      <p class="balance">Você tem $150</p>
+      <p class="allowance">
+        <span class="allowance-waiting">Sua mesada de <span class="allowance-amount">$100</span> chega em <span class="countdown">00:00:00</span></span>
+        <span class="allowance-ready" hidden>Receba sua mesada de <span class="allowance-amount">$100</span>.</span>
+      </p>
+
+      <form id="password-form" class="auth-block">
+        <h2 class="auth-heading">Mudar a senha</h2>
+        <div class="field-stack">
+          <input
+            type="password"
+            name="current"
+            autocomplete="current-password"
+            placeholder="Senha antiga"
+            required
+          />
+          <input
+            type="password"
+            name="password"
+            autocomplete="new-password"
+            placeholder="Senha nova"
+            required
+          />
+          <input
+            type="password"
+            name="confirm"
+            autocomplete="new-password"
+            placeholder="Confirmar senha nova"
+            required
+          />
+          <button type="submit">Mudar</button>
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+      </form>
+
+      <form id="email-form" class="auth-block">
+        <h2 class="auth-heading">Mudar o email</h2>
+        <div class="field-stack">
+          <input
+            type="email"
+            name="email"
+            autocomplete="email"
+            placeholder="Email novo"
+            required
+          />
+          <button type="submit">Mudar</button>
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+      </form>
+
+      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
+    </main>
+  </body>
+</html>
