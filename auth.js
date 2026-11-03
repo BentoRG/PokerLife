@@ -1,8 +1,9 @@
 (function () {
   var ACCOUNTS_KEY = "pokerlife.accounts";
   var SESSION_KEY = "pokerlife.session";
-  // Shared cloud bin so the same username/password works in any browser.
-  var CLOUD_URL = "https://json.extendsclass.com/bin/ddfaeaf";
+  // Shared cloud key so the same username/password works in any browser.
+  // ExtendsClass PUTs fail browser CORS preflight (OPTIONS 500); KVdb allows cross-origin read/write.
+  var CLOUD_URL = "https://kvdb.io/HmDEK9RXFZRnF1iG7XRCV4/accounts";
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
@@ -136,6 +137,8 @@
       cache: "no-store",
       headers: { Accept: "application/json" },
     }).then(function (response) {
+      // Missing key / empty store: treat as no accounts yet.
+      if (response.status === 404) return [];
       if (!response.ok) throw new Error("cloud read failed");
       return response.json();
     }).then(function (payload) {
