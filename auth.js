@@ -6,10 +6,8 @@
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
+  var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
-  // 25 Oct 2026 is the last Sunday the mesada stays at $100.
-  // Each later Sunday at 7:00 doubles it for the week that follows.
-  var ALLOWANCE_ANCHOR = new Date(2026, 9, 25);
   var syncing = null;
 
   function pageName() {
@@ -91,18 +89,45 @@
     });
   }
 
-  function stampLegacyAccounts(accounts) {
-    var now = Date.now();
+  function isGiftedBerg(account) {
+    if (!account || typeof account.username !== "string") return false;
+    if (account.username.trim().toLowerCase() !== "berg") return false;
+    if (account.gift50 || account.gift150) return true;
+    return accountMoney(account) === 350;
+  }
+
+  function dedupeEmails(accounts) {
+    var winners = {};
     var i;
     var account;
+    var email;
     for (i = 0; i < accounts.length; i += 1) {
       account = accounts[i];
-      if (!account || typeof account !== "object") continue;
-      if (typeof account.updatedAt !== "number" || !isFinite(account.updatedAt)) {
-        account.updatedAt = now;
+      email = String((account && account.email) || "")
+        .trim()
+        .toLowerCase();
+      if (!email) continue;
+      if (!winners[email] || accountStamp(account) >= accountStamp(winners[email])) {
+        winners[email] = account;
       }
     }
-    return accounts;
+    return accounts.filter(function (entry) {
+      email = String((entry && entry.email) || "")
+        .trim()
+        .toLowerCase();
+      if (!email) return true;
+      return winners[email] === entry;
+    });
+  }
+
+  function cleanAccounts(accounts) {
+    var list = Array.isArray(accounts) ? accounts : [];
+    list = list.filter(function (account) {
+      if (!account || typeof account.username !== "string") return false;
+      if (!account.username.trim()) return false;
+      return !isGiftedBerg(account);
+    });
+    return dedupeEmails(list);
   }
 
   function cloudLoad() {
@@ -134,41 +159,41 @@
 
   function writeAccounts(accounts, options) {
     var opts = options || {};
-    saveAccountsLocal(accounts);
-    if (opts.skipCloud) return Promise.resolve(accounts);
-    return cloudSave(accounts).catch(function () {
-      return accounts;
-    });
+    var cleaned = cleanAccounts(accounts);
+    saveAccountsLocal(cleaned);
+    if (opts.skipCloud) return Promise.resolve(cleaned);
+    return cloudLoad()
+      .then(function (remote) {
+        var merged = cleanAccounts(mergeAccounts(cleaned, remote));
+        saveAccountsLocal(merged);
+        return cloudSave(merged);
+      })
+      .then(function (merged) {
+        return merged;
+      }, function (error) {
+        if (opts.requireCloud) throw error;
+        return cleaned;
+      });
   }
 
   function syncAccounts() {
     if (syncing) return syncing;
     syncing = cloudLoad()
-      .catch(function () {
-        return null;
-      })
       .then(function (remote) {
-        var local = stampLegacyAccounts(readAccounts());
-        var merged;
-        if (!remote) {
-          if (!local.length) return local;
-          return cloudSave(local).catch(function () {
-            return local;
-          });
-        }
-        merged = mergeAccounts(local, remote);
+        var merged = cleanAccounts(mergeAccounts(readAccounts(), remote));
         saveAccountsLocal(merged);
-        return cloudSave(merged).catch(function () {
-          return merged;
-        });
+        return cloudSave(merged);
       })
-      .then(function (accounts) {
-        syncing = null;
-        return accounts;
-      }, function (error) {
-        syncing = null;
-        throw error;
-      });
+      .then(
+        function (accounts) {
+          syncing = null;
+          return accounts;
+        },
+        function (error) {
+          syncing = null;
+          throw error;
+        }
+      );
     return syncing;
   }
 
@@ -189,46 +214,17 @@
       changed = true;
     }
     if (!changed) return;
-    try {
-      writeAccounts(accounts);
-    } catch (error) {}
+    writeAccounts(accounts).catch(function () {});
   }
 
-  function grantBergGift() {
-    var accounts = readAccounts();
-    var changed = false;
-    var i;
-    var account;
-    for (i = 0; i < accounts.length; i += 1) {
-      account = accounts[i];
-      if (!account || typeof account.username !== "string") continue;
-      if (account.username.trim().toLowerCase() !== "berg") continue;
-      if (!account.gift50) {
-        account.money = accountMoney(account) + 50;
-        account.gift50 = true;
-        touchAccount(account);
-        changed = true;
-      }
-      if (!account.gift150) {
-        account.money = accountMoney(account) + 150;
-        account.gift150 = true;
-        touchAccount(account);
-        changed = true;
-      }
-    }
-    if (!changed) return;
-    try {
-      writeAccounts(accounts);
-    } catch (error) {}
-  }
-
-  applyOpeningCut();
-  grantBergGift();
-  syncAccounts().then(function () {
-    applyOpeningCut();
-    grantBergGift();
-    if (!isLoginPage() && currentUser()) paintAccount();
-  });
+  syncAccounts()
+    .then(function () {
+      applyOpeningCut();
+      if (!isLoginPage() && currentUser()) paintAccount();
+    })
+    .catch(function () {
+      if (!isLoginPage() && currentUser()) paintAccount();
+    });
 
   function currentUser() {
     try {
@@ -333,14 +329,18 @@
     } catch (error) {
       return Promise.resolve("Não foi possível salvar a conta neste navegador.");
     }
-    return writeAccounts(accounts)
+    return writeAccounts(accounts, { requireCloud: true })
       .then(function () {
         remember(trimmedUser);
         return null;
       })
       .catch(function () {
-        remember(trimmedUser);
-        return null;
+        saveAccountsLocal(
+          readAccounts().filter(function (account) {
+            return !account || String(account.username || "").toLowerCase() !== userKey;
+          })
+        );
+        return "Não foi possível salvar a conta na nuvem. Tente de novo.";
       });
   }
 
@@ -447,34 +447,9 @@
     return next.getTime();
   }
 
-  function allowanceDoublings(now) {
-    var start = new Date(allowanceWindowStart(now));
-    var days = Math.round(
-      (Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()) -
-        Date.UTC(
-          ALLOWANCE_ANCHOR.getFullYear(),
-          ALLOWANCE_ANCHOR.getMonth(),
-          ALLOWANCE_ANCHOR.getDate()
-        )) /
-        86400000
-    );
-    var weeks = Math.floor(days / 7);
-    if (weeks < 0) return 0;
-    if (weeks > 46) return 46;
-    return weeks;
-  }
-
   function allowanceAmount(now) {
-    return ALLOWANCE * Math.pow(2, allowanceDoublings(now));
-  }
-
-  function sundayAllowanceAmount(now) {
     var start = new Date(allowanceWindowStart(now));
-    var daysUntilSunday = (7 - start.getDay()) % 7;
-    var sunday;
-    if (daysUntilSunday === 0) daysUntilSunday = 7;
-    sunday = new Date(start.getFullYear(), start.getMonth(), start.getDate() + daysUntilSunday, ALLOWANCE_HOUR, 0, 0, 0);
-    return allowanceAmount(sunday.getTime());
+    return start.getDay() === 0 ? SUNDAY_ALLOWANCE : ALLOWANCE;
   }
 
   function allowanceReady(now) {
@@ -577,8 +552,7 @@
     if (email) email.textContent = account && account.email ? account.email : "";
     if (money) money.textContent = "$" + currentMoney();
     if (mesada) {
-      var now = Date.now();
-      mesada.textContent = "$" + allowanceAmount(now) + " ($" + sundayAllowanceAmount(now) + " nos Domingos)";
+      mesada.textContent = "$" + ALLOWANCE + " ($" + SUNDAY_ALLOWANCE + " nos Domingos)";
     }
     paintItems(account);
     paintLedger(account);
@@ -769,15 +743,16 @@
       if (submit) submit.disabled = true;
       showError(form, "Conectando…");
       return syncAccounts()
-        .catch(function () {
-          return readAccounts();
-        })
         .then(function () {
           return action();
         })
         .then(function (message) {
           if (submit) submit.disabled = false;
           showError(form, message);
+        })
+        .catch(function () {
+          if (submit) submit.disabled = false;
+          showError(form, "Não foi possível conectar. Tente de novo.");
         });
     }
 
