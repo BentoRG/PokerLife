@@ -90,13 +90,6 @@
     });
   }
 
-  function isGiftedBerg(account) {
-    if (!account || typeof account.username !== "string") return false;
-    if (account.username.trim().toLowerCase() !== "berg") return false;
-    if (account.gift50 || account.gift150) return true;
-    return accountMoney(account) === 350;
-  }
-
   function dedupeEmails(accounts) {
     var winners = {};
     var i;
@@ -125,8 +118,7 @@
     var list = Array.isArray(accounts) ? accounts : [];
     list = list.filter(function (account) {
       if (!account || typeof account.username !== "string") return false;
-      if (!account.username.trim()) return false;
-      return !isGiftedBerg(account);
+      return !!account.username.trim();
     });
     return dedupeEmails(list);
   }
@@ -281,7 +273,7 @@
 
   function signIn(username, password) {
     var account = findAccount(username);
-    if (!account || account.password !== password) {
+    if (!account || String(account.password) !== String(password)) {
       return "Nome de usuário ou senha incorretos.";
     }
     try {
