@@ -1,6 +1,8 @@
 (function () {
   var ACCOUNTS_KEY = "pokerlife.accounts";
   var SESSION_KEY = "pokerlife.session";
+  // Shared cloud bin so the same username/password works in any browser.
+  var CLOUD_URL = "https://json.extendsclass.com/bin/ddfaeaf";
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
@@ -8,6 +10,7 @@
   // 25 Oct 2026 is the last Sunday the mesada stays at $100.
   // Each later Sunday at 7:00 doubles it for the week that follows.
   var ALLOWANCE_ANCHOR = new Date(2026, 9, 25);
+  var syncing = null;
 
   function pageName() {
     var name = location.pathname.split("/").pop();
@@ -39,6 +42,136 @@
     }
   }
 
+  function touchAccount(account) {
+    if (!account || typeof account !== "object") return account;
+    account.updatedAt = Date.now();
+    return account;
+  }
+
+  function saveAccountsLocal(accounts) {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  }
+
+  function accountStamp(account) {
+    return account && typeof account.updatedAt === "number" && isFinite(account.updatedAt)
+      ? account.updatedAt
+      : 0;
+  }
+
+  function mergeAccounts(localAccounts, remoteAccounts) {
+    var map = {};
+    var order = [];
+    var lists = [remoteAccounts, localAccounts];
+    var listIndex;
+    var i;
+    var account;
+    var key;
+    var previous;
+
+    function consider(candidate) {
+      if (!candidate || typeof candidate !== "object") return;
+      if (typeof candidate.username !== "string" || !candidate.username.trim()) return;
+      key = candidate.username.trim().toLowerCase();
+      previous = map[key];
+      if (!previous) {
+        map[key] = candidate;
+        order.push(key);
+        return;
+      }
+      if (accountStamp(candidate) >= accountStamp(previous)) map[key] = candidate;
+    }
+
+    for (listIndex = 0; listIndex < lists.length; listIndex += 1) {
+      if (!Array.isArray(lists[listIndex])) continue;
+      for (i = 0; i < lists[listIndex].length; i += 1) consider(lists[listIndex][i]);
+    }
+
+    return order.map(function (name) {
+      return map[name];
+    });
+  }
+
+  function stampLegacyAccounts(accounts) {
+    var now = Date.now();
+    var i;
+    var account;
+    for (i = 0; i < accounts.length; i += 1) {
+      account = accounts[i];
+      if (!account || typeof account !== "object") continue;
+      if (typeof account.updatedAt !== "number" || !isFinite(account.updatedAt)) {
+        account.updatedAt = now;
+      }
+    }
+    return accounts;
+  }
+
+  function cloudLoad() {
+    return fetch(CLOUD_URL + "?t=" + Date.now(), {
+      method: "GET",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    }).then(function (response) {
+      if (!response.ok) throw new Error("cloud read failed");
+      return response.json();
+    }).then(function (payload) {
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload.accounts)) return payload.accounts;
+      return [];
+    });
+  }
+
+  function cloudSave(accounts) {
+    return fetch(CLOUD_URL, {
+      method: "PUT",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ accounts: accounts }),
+    }).then(function (response) {
+      if (!response.ok) throw new Error("cloud write failed");
+      return accounts;
+    });
+  }
+
+  function writeAccounts(accounts, options) {
+    var opts = options || {};
+    saveAccountsLocal(accounts);
+    if (opts.skipCloud) return Promise.resolve(accounts);
+    return cloudSave(accounts).catch(function () {
+      return accounts;
+    });
+  }
+
+  function syncAccounts() {
+    if (syncing) return syncing;
+    syncing = cloudLoad()
+      .catch(function () {
+        return null;
+      })
+      .then(function (remote) {
+        var local = stampLegacyAccounts(readAccounts());
+        var merged;
+        if (!remote) {
+          if (!local.length) return local;
+          return cloudSave(local).catch(function () {
+            return local;
+          });
+        }
+        merged = mergeAccounts(local, remote);
+        saveAccountsLocal(merged);
+        return cloudSave(merged).catch(function () {
+          return merged;
+        });
+      })
+      .then(function (accounts) {
+        syncing = null;
+        return accounts;
+      }, function (error) {
+        syncing = null;
+        throw error;
+      });
+    return syncing;
+  }
+
   function applyOpeningCut() {
     var accounts = readAccounts();
     var changed = false;
@@ -52,11 +185,12 @@
       if (typeof money !== "number" || !isFinite(money)) money = STARTING_MONEY + OPENING_CUT;
       account.money = Math.max(0, Math.round(money) - OPENING_CUT);
       account.openingCutApplied = true;
+      touchAccount(account);
       changed = true;
     }
     if (!changed) return;
     try {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      writeAccounts(accounts);
     } catch (error) {}
   }
 
@@ -72,22 +206,29 @@
       if (!account.gift50) {
         account.money = accountMoney(account) + 50;
         account.gift50 = true;
+        touchAccount(account);
         changed = true;
       }
       if (!account.gift150) {
         account.money = accountMoney(account) + 150;
         account.gift150 = true;
+        touchAccount(account);
         changed = true;
       }
     }
     if (!changed) return;
     try {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      writeAccounts(accounts);
     } catch (error) {}
   }
 
   applyOpeningCut();
   grantBergGift();
+  syncAccounts().then(function () {
+    applyOpeningCut();
+    grantBergGift();
+    if (!isLoginPage() && currentUser()) paintAccount();
+  });
 
   function currentUser() {
     try {
@@ -177,21 +318,30 @@
       }
     }
 
-    accounts.push({
-      username: trimmedUser,
-      password: password,
-      email: trimmedEmail,
-      money: STARTING_MONEY,
-      openingCutApplied: true,
-    });
+    accounts.push(
+      touchAccount({
+        username: trimmedUser,
+        password: password,
+        email: trimmedEmail,
+        money: STARTING_MONEY,
+        openingCutApplied: true,
+      })
+    );
 
     try {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-      remember(trimmedUser);
+      saveAccountsLocal(accounts);
     } catch (error) {
-      return "Não foi possível salvar a conta neste navegador.";
+      return Promise.resolve("Não foi possível salvar a conta neste navegador.");
     }
-    return null;
+    return writeAccounts(accounts)
+      .then(function () {
+        remember(trimmedUser);
+        return null;
+      })
+      .catch(function () {
+        remember(trimmedUser);
+        return null;
+      });
   }
 
   function accountMoney(account) {
@@ -218,19 +368,70 @@
       if (!account || typeof account.username !== "string") continue;
       if (account.username.toLowerCase() !== name.toLowerCase()) continue;
       mutator(account);
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      touchAccount(account);
+      writeAccounts(accounts);
       return account;
     }
     return null;
   }
 
-  function setMoney(amount) {
+  function readItems(account) {
+    var items = account && account.items;
+    var owned = [];
+    var i;
+    if (!Array.isArray(items)) return owned;
+    for (i = 0; i < items.length; i += 1) {
+      if (typeof items[i] === "string" && items[i].trim() && owned.indexOf(items[i]) === -1) owned.push(items[i]);
+    }
+    return owned;
+  }
+
+  function pushLedger(account, delta, label) {
+    var amount = Math.round(delta);
+    if (!amount || !label) return;
+    if (!Array.isArray(account.ledger)) account.ledger = [];
+    account.ledger.push({ delta: amount, label: label });
+    if (account.ledger.length > 100) account.ledger.splice(0, account.ledger.length - 100);
+  }
+
+  function ledgerText(delta, label) {
+    return (delta > 0 ? "+" : "-") + "$" + Math.abs(delta) + " → " + label;
+  }
+
+  function setMoney(amount, label) {
     var next = Math.round(Number(amount));
     if (!isFinite(next)) return;
     next = Math.max(0, next);
     updateAccount(function (account) {
+      var prev = accountMoney(account);
       account.money = next;
+      if (label) pushLedger(account, next - prev, label);
     });
+  }
+
+  function buyItem(name, price) {
+    var trimmed = String(name || "").trim();
+    var cost = Math.round(Number(price));
+    var result = { ok: false, error: "Não foi possível comprar." };
+    if (!trimmed || !isFinite(cost) || cost <= 0) return result;
+    if (!updateAccount(function (account) {
+      var items = readItems(account);
+      var money = accountMoney(account);
+      if (items.indexOf(trimmed) !== -1) {
+        result = { ok: false, error: "Você já tem esse item." };
+        return;
+      }
+      if (money < cost) {
+        result = { ok: false, error: "Dinheiro insuficiente." };
+        return;
+      }
+      account.money = money - cost;
+      items.push(trimmed);
+      account.items = items;
+      pushLedger(account, -cost, "compra do item " + trimmed);
+      result = { ok: true, error: "" };
+    })) return result;
+    return result;
   }
 
   function allowanceWindowStart(now) {
@@ -291,6 +492,7 @@
       if (account.allowanceClaimedWindow === windowStart) return;
       account.money = accountMoney(account) + allowanceAmount(now);
       account.allowanceClaimedWindow = windowStart;
+      pushLedger(account, allowanceAmount(now), "mesada do dia");
       claimed = true;
     });
     return claimed;
@@ -377,6 +579,42 @@
     if (mesada) {
       var now = Date.now();
       mesada.textContent = "$" + allowanceAmount(now) + " ($" + sundayAllowanceAmount(now) + " nos Domingos)";
+    }
+    paintItems(account);
+    paintLedger(account);
+  }
+
+  function paintItems(account) {
+    var list = document.querySelector(".account-items");
+    var items;
+    var i;
+    var item;
+    if (!list) return;
+    list.textContent = "";
+    items = readItems(account);
+    for (i = 0; i < items.length; i += 1) {
+      item = document.createElement("li");
+      item.textContent = items[i];
+      list.appendChild(item);
+    }
+  }
+
+  function paintLedger(account) {
+    var box = document.querySelector(".account-ledger");
+    var entries;
+    var i;
+    var entry;
+    var line;
+    if (!box) return;
+    box.textContent = "";
+    entries = account && Array.isArray(account.ledger) ? account.ledger : [];
+    for (i = entries.length - 1; i >= 0; i -= 1) {
+      entry = entries[i];
+      if (!entry || typeof entry.delta !== "number" || !entry.label) continue;
+      line = document.createElement("p");
+      line.className = "ledger";
+      line.textContent = ledgerText(entry.delta, entry.label);
+      box.appendChild(line);
     }
   }
 
@@ -490,6 +728,10 @@
   window.PokerLifeAuth = {
     currentMoney: currentMoney,
     setMoney: setMoney,
+    buyItem: buyItem,
+    items: function () {
+      return readItems(findAccount(currentUser() || "")).slice();
+    },
   };
 
   function showError(form, message) {
@@ -522,14 +764,30 @@
     var loginForm = document.querySelector("#login-form");
     var signupForm = document.querySelector("#signup-form");
 
+    function withCloud(form, action) {
+      var submit = form.querySelector('button[type="submit"], input[type="submit"]');
+      if (submit) submit.disabled = true;
+      showError(form, "Conectando…");
+      return syncAccounts()
+        .catch(function () {
+          return readAccounts();
+        })
+        .then(function () {
+          return action();
+        })
+        .then(function (message) {
+          if (submit) submit.disabled = false;
+          showError(form, message);
+        });
+    }
+
     if (loginForm) {
       loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
         var data = new FormData(loginForm);
-        showError(
-          loginForm,
-          signIn(String(data.get("username") || ""), String(data.get("password") || ""))
-        );
+        withCloud(loginForm, function () {
+          return signIn(String(data.get("username") || ""), String(data.get("password") || ""));
+        });
       });
     }
 
@@ -537,15 +795,14 @@
       signupForm.addEventListener("submit", function (event) {
         event.preventDefault();
         var data = new FormData(signupForm);
-        showError(
-          signupForm,
-          signUp(
+        withCloud(signupForm, function () {
+          return signUp(
             String(data.get("username") || ""),
             String(data.get("password") || ""),
             String(data.get("confirm") || ""),
             String(data.get("email") || "")
-          )
-        );
+          );
+        });
       });
     }
   });

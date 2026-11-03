@@ -430,7 +430,7 @@
     if (typeof window === "undefined" || !window.PokerLifeAuth || !roster) return;
     for (i = 0; i < roster.length; i += 1) {
       if (roster[i].isHuman) {
-        window.PokerLifeAuth.setMoney(roster[i].stack);
+        window.PokerLifeAuth.setMoney(roster[i].stack, "partida de poker");
         return;
       }
     }

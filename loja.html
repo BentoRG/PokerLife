@@ -24,32 +24,32 @@
 
     <main class="table-main">
       <div class="shop-grid">
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 1" data-price="40">
           <p class="item-name">Item 1</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
         </article>
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 2" data-price="40">
           <p class="item-name">Item 2</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
         </article>
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 3" data-price="40">
           <p class="item-name">Item 3</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
         </article>
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 4" data-price="40">
           <p class="item-name">Item 4</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
         </article>
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 5" data-price="40">
           <p class="item-name">Item 5</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
         </article>
-        <article class="shop-item">
+        <article class="shop-item" data-item="Item 6" data-price="40">
           <p class="item-name">Item 6</p>
           <p class="item-price">$40</p>
           <button type="button">Comprar</button>
@@ -65,16 +65,43 @@
         var timer;
         var buttons = document.querySelectorAll(".shop-item button");
         var i;
-        function showUnavailable() {
+        function showNotice(message) {
           notice.hidden = false;
-          notice.textContent = "essa funcionalidade ainda nao foi aplicada";
+          notice.textContent = message;
           clearTimeout(timer);
           timer = setTimeout(function () {
             notice.hidden = true;
             notice.textContent = "";
           }, 3200);
         }
-        for (i = 0; i < buttons.length; i += 1) buttons[i].addEventListener("click", showUnavailable);
+        function markOwned() {
+          var owned = window.PokerLifeAuth.items();
+          var cards = document.querySelectorAll(".shop-item");
+          var index;
+          var card;
+          var button;
+          for (index = 0; index < cards.length; index += 1) {
+            card = cards[index];
+            button = card.querySelector("button");
+            if (owned.indexOf(card.getAttribute("data-item")) === -1) continue;
+            button.disabled = true;
+            button.textContent = "Comprado";
+          }
+        }
+        for (i = 0; i < buttons.length; i += 1) {
+          buttons[i].addEventListener("click", function () {
+            var card = this.closest(".shop-item");
+            var result = window.PokerLifeAuth.buyItem(card.getAttribute("data-item"), card.getAttribute("data-price"));
+            if (!result.ok) {
+              showNotice(result.error);
+              return;
+            }
+            this.disabled = true;
+            this.textContent = "Comprado";
+            showNotice("Item comprado.");
+          });
+        }
+        markOwned();
       })();
     </script>
   </body>
