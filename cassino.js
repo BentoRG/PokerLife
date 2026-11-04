@@ -38,6 +38,7 @@
   var shownBoard = 0;
   var shownHoles = false;
   var handClosing = false;
+  var vsBots = false;
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
@@ -112,11 +113,20 @@
     var score;
     var cards;
     var draw;
+    var boardHigh;
     var bases = [0.12, 0.42, 0.6, 0.72, 0.8, 0.84, 0.9, 0.96, 0.99];
     if (!table.board.length) return clamp(chen(player.hole[0], player.hole[1]) / 20, 0, 1);
     made = Poker.rankCards(player.hole.concat(table.board));
     base = bases[made[0]];
     score = base + made[1] / 100;
+    boardHigh = Math.max.apply(null, table.board.map(rankValue));
+    if (made[0] === 1) {
+      if (made[1] > boardHigh) score += 0.16;
+      else if (made[1] === boardHigh) score += 0.1;
+      else if (made[1] >= boardHigh - 2) score += 0.04;
+    } else if (made[0] === 2) {
+      score += 0.06;
+    }
     if (table.board.length < 5 && made[0] < 4) {
       cards = player.hole.concat(table.board);
       if (hasFlushDraw(cards)) score += 0.16;
@@ -135,59 +145,222 @@
     return clamp(raw, legal.minRaiseTo, legal.maxRaiseTo);
   }
 
-  // Bot 2 is the only strong player. Bots 1 and 3 are weak, and Bot 4 is in between.
+  // Difficulty out of 10, and each bot plays with a distinct personality.
+  // Bot 1 (4): maniac — all-ins on any hint of strength.
+  // Bot 2 (10): expert — sound sizes, pot odds, and opponent ranges.
+  // Bot 3 (5): mediocre recreational player.
+  // Bot 4 (8): solid but sticky — calls with good cards, ignores what others may hold.
   var SKILL = {
     lia: 4,
-    caio: 9,
-    duda: 4,
-    ravi: 7,
+    caio: 10,
+    duda: 5,
+    ravi: 8,
   };
 
-  function skillOf(player) {
-    var skill = SKILL[player.id];
-    return skill == null ? 5 : skill;
+  function liveCount(table) {
+    return table.players.filter(function (player) {
+      return !player.folded;
+    }).length;
+  }
+
+  function madeRank(player, table) {
+    if (!table.board.length) return -1;
+    return Poker.rankCards(player.hole.concat(table.board))[0];
+  }
+
+  // How scary the board is for one-pair / high-card holdings (Bot 2 uses this).
+  function boardDanger(table) {
+    var suits = { s: 0, h: 0, d: 0, c: 0 };
+    var ranks = {};
+    var values;
+    var i;
+    var gaps;
+    var danger = 0;
+    if (table.board.length < 3) return 0;
+    table.board.forEach(function (card) {
+      suits[card.charAt(1)] += 1;
+      ranks[rankValue(card)] = (ranks[rankValue(card)] || 0) + 1;
+    });
+    if (suits.s >= 3 || suits.h >= 3 || suits.d >= 3 || suits.c >= 3) danger += 0.35;
+    if (suits.s >= 4 || suits.h >= 4 || suits.d >= 4 || suits.c >= 4) danger += 0.2;
+    Object.keys(ranks).forEach(function (key) {
+      if (ranks[key] >= 2) danger += 0.18;
+    });
+    values = Object.keys(ranks)
+      .map(Number)
+      .sort(function (a, b) {
+        return a - b;
+      });
+    for (i = 0; i < values.length - 1; i += 1) {
+      gaps = values[i + 1] - values[i];
+      if (gaps === 1) danger += 0.08;
+      else if (gaps === 2) danger += 0.04;
+    }
+    return clamp(danger, 0, 1);
+  }
+
+  // Expert relative strength: discounts raw hand strength when the board or
+  // multiway pot makes it likely someone else has us beat.
+  function relativeStrength(player, table) {
+    var raw = strength(player, table);
+    var made = madeRank(player, table);
+    var danger = boardDanger(table);
+    var live = liveCount(table);
+    var boardHigh;
+    var pairRank;
+    var weakOnePair = false;
+    if (made === 1 && table.board.length) {
+      boardHigh = Math.max.apply(null, table.board.map(rankValue));
+      pairRank = Poker.rankCards(player.hole.concat(table.board))[1];
+      weakOnePair = pairRank < boardHigh;
+    }
+    if (made === 0) {
+      raw -= danger * 0.35;
+      if (live >= 3) raw -= 0.12;
+      if (live >= 4) raw -= 0.06;
+    } else if (made === 1 && weakOnePair) {
+      raw -= danger * 0.3;
+      if (live >= 3) raw -= 0.08;
+    } else if (made === 1) {
+      raw -= danger * 0.12;
+    } else if (made === 2 && danger > 0.45) {
+      raw -= 0.06;
+    }
+    return clamp(raw, 0, 1);
+  }
+
+  function canRaise(legal) {
+    return legal.minRaiseTo != null;
+  }
+
+  function goAllIn(legal) {
+    return { type: "raise", to: legal.maxRaiseTo };
+  }
+
+  // Bot 1 — 4/10 maniac: shoves whenever cards look even slightly promising.
+  function chooseBot1(table, legal, player) {
+    var score = strength(player, table);
+    var hopeful = score >= 0.26 || (!table.board.length && chen(player.hole[0], player.hole[1]) >= 5);
+    if (hopeful && canRaise(legal)) return goAllIn(legal);
+    if (legal.call > 0) {
+      if (hopeful || legal.call <= table.bb * 2) return { type: "call" };
+      return legal.fold ? { type: "fold" } : { type: "call" };
+    }
+    if (legal.check) return { type: "check" };
+    if (canRaise(legal) && Math.random() < 0.2) return goAllIn(legal);
+    return legal.fold ? { type: "fold" } : { type: "check" };
+  }
+
+  // Bot 2 — 10/10 expert: value bets, folds weak holdings to pressure, rare bluffs.
+  function chooseBot2(table, legal, player) {
+    var raw = strength(player, table);
+    var score = relativeStrength(player, table);
+    var pot = Poker.potSize(table);
+    var price = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
+    var bigBet = price >= 0.45;
+    var made = madeRank(player, table);
+    if (legal.call > 0) {
+      if (score >= 0.78 && canRaise(legal)) {
+        return { type: "raise", to: sizedBet(table, legal, bigBet ? 1.1 : 0.75) };
+      }
+      if (score >= 0.66 && canRaise(legal) && !bigBet && Math.random() < 0.75) {
+        return { type: "raise", to: sizedBet(table, legal, 0.66) };
+      }
+      if (score >= 0.7 || (raw >= 0.68 && score >= 0.58)) return { type: "call" };
+      if (score + 0.05 >= price && score >= (bigBet ? 0.4 : 0.28)) return { type: "call" };
+      if (
+        canRaise(legal) &&
+        score >= 0.34 &&
+        score < 0.55 &&
+        !bigBet &&
+        table.board.length >= 3 &&
+        Math.random() < 0.08
+      ) {
+        return { type: "raise", to: sizedBet(table, legal, 0.55) };
+      }
+      return legal.fold ? { type: "fold" } : { type: "call" };
+    }
+    if (canRaise(legal) && score >= 0.6) {
+      return { type: "raise", to: sizedBet(table, legal, made >= 5 ? 0.85 : 0.66) };
+    }
+    if (canRaise(legal) && score >= 0.5 && Math.random() < 0.55) {
+      return { type: "raise", to: sizedBet(table, legal, 0.5) };
+    }
+    if (canRaise(legal) && score >= 0.32 && score < 0.48 && Math.random() < 0.12) {
+      return { type: "raise", to: sizedBet(table, legal, 0.55) };
+    }
+    if (legal.check) return { type: "check" };
+    if (raw >= 0.7) return { type: "call" };
+    return legal.fold ? { type: "fold" } : { type: "check" };
+  }
+
+  // Bot 3 — 5/10 mediocre: loose, poorly sized, and inconsistent.
+  function chooseBot3(table, legal, player) {
+    var trueScore = strength(player, table);
+    var score = clamp(trueScore + (Math.random() - 0.5) * 0.45, 0, 1);
+    var pot = Poker.potSize(table);
+    var price = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
+    if (legal.call > 0) {
+      if (score >= 0.82 && canRaise(legal) && Math.random() < 0.55) {
+        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.35 : 1.2) };
+      }
+      if (canRaise(legal) && score < 0.55 && Math.random() < 0.18) {
+        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.25 : 1.4) };
+      }
+      if (score + 0.2 >= price || score >= 0.22 || Math.random() < 0.28) return { type: "call" };
+      if (trueScore >= 0.75 && Math.random() < 0.2) return legal.fold ? { type: "fold" } : { type: "call" };
+      return legal.fold ? { type: "fold" } : { type: "call" };
+    }
+    if (canRaise(legal) && score >= 0.7 && Math.random() < 0.6) {
+      return { type: "raise", to: sizedBet(table, legal, 0.4) };
+    }
+    if (canRaise(legal) && score >= 0.4 && Math.random() < 0.25) {
+      return { type: "raise", to: sizedBet(table, legal, 0.35) };
+    }
+    if (canRaise(legal) && Math.random() < 0.12) {
+      return { type: "raise", to: sizedBet(table, legal, 0.3) };
+    }
+    if (legal.check) return { type: "check" };
+    return legal.fold ? { type: "fold" } : { type: "check" };
+  }
+
+  // Bot 4 — 8/10 sticky value player: solid when betting, but always pays off
+  // with "good cards" and never discounts for what opponents might hold.
+  function chooseBot4(table, legal, player) {
+    var score = strength(player, table);
+    var pot = Poker.potSize(table);
+    var price = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
+    var goodCards = score >= 0.48;
+    if (legal.call > 0) {
+      if (score >= 0.76 && canRaise(legal) && Math.random() < 0.85) {
+        return { type: "raise", to: sizedBet(table, legal, 0.7) };
+      }
+      if (goodCards) return { type: "call" };
+      if (score + 0.08 >= price && score >= 0.3) return { type: "call" };
+      if (Math.random() < 0.12) return { type: "call" };
+      return legal.fold ? { type: "fold" } : { type: "call" };
+    }
+    if (canRaise(legal) && score >= 0.68 && Math.random() < 0.9) {
+      return { type: "raise", to: sizedBet(table, legal, 0.66) };
+    }
+    if (canRaise(legal) && score >= 0.52 && Math.random() < 0.45) {
+      return { type: "raise", to: sizedBet(table, legal, 0.5) };
+    }
+    if (canRaise(legal) && !goodCards && Math.random() < 0.06) {
+      return { type: "raise", to: sizedBet(table, legal, 0.4) };
+    }
+    if (legal.check) return { type: "check" };
+    return legal.fold ? { type: "fold" } : { type: "check" };
   }
 
   function chooseBot(table) {
     var legal = Poker.legalActions(table);
     var player = table.players[table.toAct];
-    var skill = skillOf(player);
-    var error = (10 - skill) / 10;
-    var trueScore = strength(player, table);
-    var score = clamp(trueScore + (Math.random() - 0.5) * error * 0.9, 0, 1);
-    var pot = Poker.potSize(table);
-    var price = legal.call > 0 ? legal.call / (pot + legal.call) : 0;
-    var size = skill >= 9 ? 1 : skill >= 7 ? 0.66 : 0.4;
-    var valueAt = skill >= 9 ? 0.62 : skill >= 7 ? 0.72 : 0.84;
-    if (legal.call > 0) {
-      if (score >= valueAt && legal.minRaiseTo != null && Math.random() < 0.92 - error * 0.55) {
-        return { type: "raise", to: sizedBet(table, legal, size) };
-      }
-      if (
-        legal.minRaiseTo != null &&
-        score < 0.72 &&
-        Math.random() < (skill >= 9 ? 0.05 : error * 0.22) &&
-        (skill < 9 || score >= 0.34)
-      ) {
-        return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.66 : Math.random() < 0.5 ? 0.25 : 1.25) };
-      }
-      if (score + error * 0.28 >= price && score >= 0.2 - error * 0.18) return { type: "call" };
-      if (Math.random() < error * 0.38) return { type: "call" };
-      if (trueScore >= 0.8 && Math.random() < error * 0.22) return { type: "fold" };
-      return legal.fold ? { type: "fold" } : { type: "call" };
-    }
-    if (legal.minRaiseTo != null && score >= valueAt && Math.random() < 0.94 - error * 0.5) {
-      return { type: "raise", to: sizedBet(table, legal, size) };
-    }
-    if (legal.minRaiseTo != null && score >= 0.48 && Math.random() < 0.42 - error * 0.28) {
-      return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.55 : 0.4) };
-    }
-    if (legal.minRaiseTo != null && Math.random() < 0.05 + error * 0.18 && (skill < 9 || score >= 0.32)) {
-      return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.66 : 0.35) };
-    }
-    if (legal.check) return { type: "check" };
-    if (legal.fold) return { type: "fold" };
-    return { type: "check" };
+    if (player.id === "lia") return chooseBot1(table, legal, player);
+    if (player.id === "caio") return chooseBot2(table, legal, player);
+    if (player.id === "duda") return chooseBot3(table, legal, player);
+    if (player.id === "ravi") return chooseBot4(table, legal, player);
+    return chooseBot3(table, legal, player);
   }
 
   function later(fn, ms) {
@@ -448,11 +621,46 @@
   }
 
   function startMatch() {
+    vsBots = true;
     freshRoster();
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
     startHand();
+  }
+
+  function heroFolded() {
+    var i;
+    if (!state) return false;
+    for (i = 0; i < state.players.length; i += 1) {
+      if (state.players[i].isHuman) return !!state.players[i].folded;
+    }
+    return false;
+  }
+
+  function canSkipRound() {
+    return !!(vsBots && state && !handClosing && heroFolded());
+  }
+
+  function skipToHandEnd() {
+    var guard = 0;
+    if (!canSkipRound()) return;
+    clearTimeout(timer);
+    dealToken += 1;
+    while (state && !state.handOver && guard < 500) {
+      guard += 1;
+      if (state.toAct < 0) {
+        Poker.advance(state);
+        continue;
+      }
+      if (state.players[state.toAct].isHuman) break;
+      if (!applyBot()) break;
+    }
+    if (state) {
+      shownBoard = state.board.length;
+      shownHoles = true;
+    }
+    finishHand();
   }
 
   function prefersReducedMotion() {
@@ -701,9 +909,18 @@
     var raiseBox = document.getElementById("raise-box");
     var legal;
     var player;
+    var skip;
     clear(box);
     if (raiseBox) raiseBox.remove();
-    if (!state || state.handOver || state.toAct < 0 || !state.players[state.toAct].isHuman) return;
+    if (!state || handClosing) return;
+    if (canSkipRound()) {
+      skip = actionButton("Pular ao fim", skipToHandEnd);
+      skip.id = "skip-round";
+      skip.className = "skip-round";
+      box.appendChild(skip);
+      return;
+    }
+    if (state.handOver || state.toAct < 0 || !state.players[state.toAct].isHuman) return;
     legal = Poker.legalActions(state);
     player = state.players[state.toAct];
     if (legal.fold) box.appendChild(actionButton("Desistir", function () { humanAct("fold"); }));
