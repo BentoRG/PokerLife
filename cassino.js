@@ -136,11 +136,11 @@
     return clamp(raw, legal.minRaiseTo, legal.maxRaiseTo);
   }
 
-  // Bot difficulties: 1=6/10, 2=11/10, 3=7/10, 4=10/10.
+  // Bot difficulties: 1=6/10, 2=11/10, 3=8/10, 4=10/10.
   var SKILL = {
     lia: 6,
     caio: 11,
-    duda: 7,
+    duda: 8,
     ravi: 10,
   };
 
