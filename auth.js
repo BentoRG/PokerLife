@@ -9,6 +9,7 @@
   var ALLOWANCE = 100;
   var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
+  var RESET_TOKEN_MS = 2 * 60 * 60 * 1000;
   var syncing = null;
 
   function pageName() {
@@ -20,10 +21,19 @@
     return pageName() === "login.html";
   }
 
+  function isResetPage() {
+    return pageName() === "redefinir.html";
+  }
+
+  function isPublicPage() {
+    return isLoginPage() || isResetPage();
+  }
+
   function safeNext(value) {
     if (typeof value !== "string") return "index.html";
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(value)) return "index.html";
     if (value.toLowerCase() === "login.html") return "index.html";
+    if (value.toLowerCase() === "redefinir.html") return "index.html";
     return value;
   }
 
@@ -267,7 +277,7 @@
   }
 
   window.addEventListener("pageshow", function (event) {
-    if (!event.persisted || isLoginPage() || currentUser()) return;
+    if (!event.persisted || isPublicPage() || currentUser()) return;
     location.replace("login.html?next=" + encodeURIComponent(safeNext(pageName())));
   });
 
@@ -618,22 +628,112 @@
     location.replace("login.html");
   }
 
-  function changePassword(email, next, confirm) {
-    var account = findAccount(currentUser() || "");
-    var trimmed = String(email || "").trim();
-    if (!trimmed || !next || !confirm) return "Preencha todos os campos.";
-    if (!account || String(account.email || "").toLowerCase() !== trimmed.toLowerCase()) {
-      return "Esse email não é o da sua conta.";
+  function makeResetToken() {
+    var bytes = new Uint8Array(24);
+    var i;
+    if (window.crypto && typeof crypto.getRandomValues === "function") {
+      crypto.getRandomValues(bytes);
+    } else {
+      for (i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
     }
-    if (next !== confirm) return "As senhas não coincidem.";
-    try {
-      if (!updateAccount(function (record) {
-        record.password = next;
-      })) return "Não foi possível salvar a conta neste navegador.";
-    } catch (error) {
-      return "Não foi possível salvar a conta neste navegador.";
+    return Array.prototype.map.call(bytes, function (value) {
+      return ("0" + value.toString(16)).slice(-2);
+    }).join("");
+  }
+
+  function sendResetEmail(toEmail, resetUrl) {
+    return fetch("https://formsubmit.co/ajax/" + encodeURIComponent(toEmail), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        _subject: "PokerLife — trocar senha",
+        _template: "box",
+        _captcha: "false",
+        message:
+          "Você pediu para trocar a senha da sua conta no PokerLife.\n\n" +
+          "Abra o link abaixo e digite a nova senha duas vezes:\n" +
+          resetUrl +
+          "\n\nSe você não pediu isso, ignore este email.",
+      }),
+    }).then(function (response) {
+      if (!response.ok) throw new Error("email failed");
+      return response.json().catch(function () {
+        return {};
+      });
+    });
+  }
+
+  function requestPasswordReset() {
+    var name = currentUser();
+    var account = findAccount(name || "");
+    var email;
+    var token;
+    var accounts;
+    var i;
+    var resetUrl;
+    if (!account) return Promise.resolve("Não foi possível achar sua conta.");
+    email = String(account.email || "").trim();
+    if (!email) return Promise.resolve("Sua conta não tem email.");
+    token = makeResetToken();
+    accounts = readAccounts();
+    for (i = 0; i < accounts.length; i += 1) {
+      if (!accounts[i] || typeof accounts[i].username !== "string") continue;
+      if (accounts[i].username.toLowerCase() !== name.toLowerCase()) continue;
+      accounts[i].passwordResetToken = token;
+      accounts[i].passwordResetExpires = Date.now() + RESET_TOKEN_MS;
+      touchAccount(accounts[i]);
+      break;
     }
-    return null;
+    resetUrl = new URL("redefinir.html", location.href);
+    resetUrl.searchParams.set("token", token);
+    return writeAccounts(accounts, { requireCloud: true })
+      .then(function () {
+        return sendResetEmail(email, resetUrl.toString());
+      })
+      .then(function () {
+        return null;
+      })
+      .catch(function () {
+        return "Não foi possível enviar o email. Tente de novo.";
+      });
+  }
+
+  function completePasswordReset(token, next, confirm) {
+    var key = String(token || "").trim();
+    var password = String(next || "");
+    var accounts;
+    var i;
+    var account;
+    var stamp;
+    if (!key || !password || !confirm) return Promise.resolve("Preencha todos os campos.");
+    if (password !== confirm) return Promise.resolve("As senhas não coincidem.");
+    accounts = readAccounts();
+    account = null;
+    for (i = 0; i < accounts.length; i += 1) {
+      if (!accounts[i] || typeof accounts[i] !== "object") continue;
+      if (String(accounts[i].passwordResetToken || "") !== key) continue;
+      stamp = accounts[i].passwordResetExpires;
+      if (typeof stamp !== "number" || !isFinite(stamp) || stamp < Date.now()) {
+        return Promise.resolve("Esse link expirou. Peça um novo em Sua conta.");
+      }
+      account = accounts[i];
+      break;
+    }
+    if (!account) return Promise.resolve("Esse link é inválido. Peça um novo em Sua conta.");
+    account.password = password;
+    delete account.passwordResetToken;
+    delete account.passwordResetExpires;
+    touchAccount(account);
+    return writeAccounts(accounts, { requireCloud: true })
+      .then(function () {
+        return null;
+      })
+      .catch(function () {
+        return "Não foi possível salvar a senha. Tente de novo.";
+      });
   }
 
   function changeEmail(email) {
@@ -676,25 +776,39 @@
     el.textContent = message;
   }
 
+  function showStatusMessage(el, message, success) {
+    if (!el) return;
+    el.classList.toggle("form-success", !!success);
+    if (!message) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
   function bindAccountForms() {
-    var passwordForm = document.querySelector("#password-form");
+    var changePassword = document.querySelector("#change-password");
+    var resetStatus = document.querySelector(".password-reset-status");
     var emailForm = document.querySelector("#email-form");
     var logout = document.querySelector("#logout");
-    if (passwordForm) {
-      passwordForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        var data = new FormData(passwordForm);
-        var message = changePassword(
-          String(data.get("email") || ""),
-          String(data.get("password") || ""),
-          String(data.get("confirm") || "")
-        );
-        if (message) {
-          showFormMessage(passwordForm, message, false);
-          return;
-        }
-        passwordForm.reset();
-        showFormMessage(passwordForm, "Senha alterada.", true);
+    if (changePassword) {
+      changePassword.addEventListener("click", function () {
+        changePassword.disabled = true;
+        showStatusMessage(resetStatus, "Enviando email…", false);
+        requestPasswordReset().then(function (message) {
+          changePassword.disabled = false;
+          if (message) {
+            showStatusMessage(resetStatus, message, false);
+            return;
+          }
+          showStatusMessage(
+            resetStatus,
+            "Enviamos um email para a conta. Abra o link e digite a nova senha duas vezes.",
+            true
+          );
+        });
       });
     }
     if (emailForm) {
@@ -718,6 +832,44 @@
     }
   }
 
+  function bindResetForm() {
+    var form = document.querySelector("#reset-form");
+    var params = new URLSearchParams(location.search);
+    var token = params.get("token") || "";
+    if (!form) return;
+    if (!token) {
+      showError(form, "Esse link é inválido. Peça um novo em Sua conta.");
+      return;
+    }
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      var submit = form.querySelector('button[type="submit"], input[type="submit"]');
+      if (submit) submit.disabled = true;
+      showError(form, "Salvando…");
+      syncAccounts()
+        .catch(function () {
+          return null;
+        })
+        .then(function () {
+          return completePasswordReset(
+            token,
+            String(data.get("password") || ""),
+            String(data.get("confirm") || "")
+          );
+        })
+        .then(function (message) {
+          if (submit) submit.disabled = false;
+          if (message) {
+            showError(form, message);
+            return;
+          }
+          form.reset();
+          showFormMessage(form, "Senha alterada. Você já pode entrar com a senha nova.", true);
+        });
+    });
+  }
+
   window.PokerLifeAuth = {
     currentMoney: currentMoney,
     setMoney: setMoney,
@@ -731,7 +883,7 @@
     showFormMessage(form, message, false);
   }
 
-  if (!isLoginPage() && currentUser()) {
+  if (!isPublicPage() && currentUser()) {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", paintAccount);
       document.addEventListener("DOMContentLoaded", bindAccountForms);
@@ -741,13 +893,22 @@
     }
   }
 
-  if (!isLoginPage() && !currentUser()) {
+  if (!isPublicPage() && !currentUser()) {
     location.replace("login.html?next=" + encodeURIComponent(safeNext(pageName())));
     return;
   }
 
   if (isLoginPage() && currentUser()) {
     location.replace(destination());
+    return;
+  }
+
+  if (isResetPage()) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bindResetForm);
+    } else {
+      bindResetForm();
+    }
     return;
   }
 

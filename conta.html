@@ -40,27 +40,7 @@
         <p>
           <button type="button" class="email-change" id="change-password">(trocar senha)</button>
         </p>
-        <form id="password-form" class="email-swap" hidden>
-          <div class="field-stack">
-            <input type="email" name="email" autocomplete="email" placeholder="Seu email" required />
-            <input
-              type="password"
-              name="password"
-              autocomplete="new-password"
-              placeholder="Senha nova"
-              required
-            />
-            <input
-              type="password"
-              name="confirm"
-              autocomplete="new-password"
-              placeholder="Confirme a senha nova"
-              required
-            />
-            <button type="submit">Mudar</button>
-          </div>
-          <p class="form-error" role="alert" hidden></p>
-        </form>
+        <p class="form-error password-reset-status" role="alert" hidden></p>
 
         <h2>Seus itens:</h2>
         <ul class="account-items"></ul>
@@ -80,11 +60,6 @@
     <script>
       document.getElementById("change-email").addEventListener("click", function () {
         var form = document.getElementById("email-form");
-        form.hidden = false;
-        form.querySelector("input").focus();
-      });
-      document.getElementById("change-password").addEventListener("click", function () {
-        var form = document.getElementById("password-form");
         form.hidden = false;
         form.querySelector("input").focus();
       });

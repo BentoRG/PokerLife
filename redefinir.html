@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="auth.js"></script>
+    <title>Redefinir senha — PokerLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header login-header">
+      <div class="brand">
+        <h1>PokerLife</h1>
+        <p class="subtitle">A vida até o que um herdeiro conhece</p>
+      </div>
+      <p class="login-title">Nova<br />senha</p>
+    </header>
+
+    <main class="login-main">
+      <form id="reset-form" class="auth-block">
+        <h2 class="auth-heading">Digite a nova senha duas vezes:</h2>
+        <div class="field-stack">
+          <input
+            type="password"
+            name="password"
+            autocomplete="new-password"
+            placeholder="Senha nova"
+            required
+          />
+          <input
+            type="password"
+            name="confirm"
+            autocomplete="new-password"
+            placeholder="Confirme a senha nova"
+            required
+          />
+          <button type="submit">Salvar senha</button>
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+      </form>
+      <p class="table-nav"><a href="login.html">Voltar ao login</a></p>
+    </main>
+  </body>
+</html>
