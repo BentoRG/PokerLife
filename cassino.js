@@ -28,6 +28,8 @@
     complete: "Mão encerrada",
   };
   var RANK = "23456789TJQKA";
+  // Marks an open match so a page reload never restores the old hand.
+  var MATCH_FLAG = "pokerlife.cassino.match";
 
   var roster;
   var button;
@@ -42,6 +44,27 @@
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
+
+  function setMatchFlag() {
+    try {
+      sessionStorage.setItem(MATCH_FLAG, "1");
+    } catch (error) {}
+  }
+
+  function clearMatchFlag() {
+    try {
+      sessionStorage.removeItem(MATCH_FLAG);
+    } catch (error) {}
+  }
+
+  function takeMatchFlag() {
+    var active = false;
+    try {
+      active = sessionStorage.getItem(MATCH_FLAG) === "1";
+      sessionStorage.removeItem(MATCH_FLAG);
+    } catch (error) {}
+    return active;
+  }
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -411,6 +434,9 @@
     var raiseBox = document.getElementById("raise-box");
     clearTimeout(timer);
     dealToken += 1;
+    clearMatchFlag();
+    vsBots = false;
+    roster = null;
     state = null;
     if (raiseBox) raiseBox.remove();
     clear(document.getElementById("actions"));
@@ -449,7 +475,10 @@
   }
 
   function startMatch() {
+    clearTimeout(timer);
+    dealToken += 1;
     vsBots = true;
+    setMatchFlag();
     freshRoster();
     hideNotice();
     document.getElementById("mode-select").hidden = true;
@@ -1029,10 +1058,21 @@
   }
 
   function init() {
+    var homeLink = document.querySelector(".table-nav a");
+    var resumeAsNewMatch = takeMatchFlag();
     document.getElementById("play-bots").addEventListener("click", startMatch);
     document.getElementById("play-friends").addEventListener("click", showUnavailable);
     window.addEventListener("resize", keepHeroVisible);
-    showModeSelect();
+    // Reload / bfcache must never bring back the previous cards or pot.
+    window.addEventListener("pageshow", function (event) {
+      if (!event.persisted) return;
+      if (vsBots || (document.getElementById("match") && !document.getElementById("match").hidden)) {
+        startMatch();
+      }
+    });
+    if (homeLink) homeLink.addEventListener("click", clearMatchFlag);
+    if (resumeAsNewMatch) startMatch();
+    else showModeSelect();
   }
 
   if (typeof document !== "undefined") {
