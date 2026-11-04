@@ -136,12 +136,12 @@
     return clamp(raw, legal.minRaiseTo, legal.maxRaiseTo);
   }
 
-  // Bot 2 is the only strong player. Bots 1 and 3 are weak, and Bot 4 is in between.
+  // Bot difficulties: 1=6/10, 2=11/10, 3=7/10, 4=10/10.
   var SKILL = {
-    lia: 4,
-    caio: 9,
-    duda: 4,
-    ravi: 7,
+    lia: 6,
+    caio: 11,
+    duda: 7,
+    ravi: 10,
   };
 
   function skillOf(player) {
