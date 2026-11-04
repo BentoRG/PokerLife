@@ -469,17 +469,25 @@ main {
 }
 
 .table-nav a {
-  color: #595959;
-  font-size: 2.4rem;
+  display: inline-block;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font-size: 1.35rem;
   font-weight: 400;
-  line-height: 1.15;
+  line-height: 1.25;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.table-nav a:hover,
+.table-nav a:hover {
+  background: #f3f3f3;
+}
+
 .table-nav a:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
+  outline: 2px solid #595959;
+  outline-offset: -3px;
 }
 
 .table-status {
@@ -937,7 +945,8 @@ main {
   }
 
   .table-nav a {
-    font-size: 1.25rem;
+    padding: 0.65rem 0.9rem;
+    font-size: 1.05rem;
   }
 
   .shop-grid {
