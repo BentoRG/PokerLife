@@ -28,8 +28,8 @@
     complete: "Mão encerrada",
   };
   var RANK = "23456789TJQKA";
-  // Marks an open match so a page reload never restores the old hand.
-  var MATCH_FLAG = "pokerlife.cassino.match";
+  // Persist the live match so a refresh cannot discard a bad hand for a new deal.
+  var MATCH_KEY = "pokerlife.cassino.match";
 
   var roster;
   var button;
@@ -45,25 +45,40 @@
   var noticeTimer;
   var NOTICE_MS = 3200;
 
-  function setMatchFlag() {
+  function clearMatchSave() {
     try {
-      sessionStorage.setItem(MATCH_FLAG, "1");
+      sessionStorage.removeItem(MATCH_KEY);
     } catch (error) {}
   }
 
-  function clearMatchFlag() {
+  function saveMatch() {
+    if (!vsBots || !roster) return;
     try {
-      sessionStorage.removeItem(MATCH_FLAG);
+      sessionStorage.setItem(
+        MATCH_KEY,
+        JSON.stringify({
+          vsBots: vsBots,
+          button: button,
+          roster: roster,
+          state: state,
+          shownBoard: shownBoard,
+          shownHoles: shownHoles,
+          handClosing: handClosing,
+          statusMessage: statusMessage,
+        })
+      );
     } catch (error) {}
   }
 
-  function takeMatchFlag() {
-    var active = false;
+  function loadMatch() {
     try {
-      active = sessionStorage.getItem(MATCH_FLAG) === "1";
-      sessionStorage.removeItem(MATCH_FLAG);
-    } catch (error) {}
-    return active;
+      var raw = sessionStorage.getItem(MATCH_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (error) {
+      clearMatchSave();
+      return null;
+    }
   }
 
   function clamp(value, min, max) {
@@ -434,7 +449,7 @@
     var raiseBox = document.getElementById("raise-box");
     clearTimeout(timer);
     dealToken += 1;
-    clearMatchFlag();
+    clearMatchSave();
     vsBots = false;
     roster = null;
     state = null;
@@ -478,12 +493,54 @@
     clearTimeout(timer);
     dealToken += 1;
     vsBots = true;
-    setMatchFlag();
     freshRoster();
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
     startHand();
+  }
+
+  function resumeMatch(saved) {
+    clearTimeout(timer);
+    dealToken += 1;
+    vsBots = true;
+    button = saved.button;
+    roster = saved.roster;
+    state = saved.state || null;
+    shownBoard = saved.shownBoard || 0;
+    shownHoles = !!saved.shownHoles;
+    handClosing = !!saved.handClosing;
+    logCursor = 0;
+    statusMessage = saved.statusMessage || "";
+    hideNotice();
+    document.getElementById("mode-select").hidden = true;
+    document.getElementById("match").hidden = false;
+    clear(document.getElementById("log"));
+    if (!roster || !roster.length) {
+      showModeSelect();
+      return;
+    }
+    if (!state) {
+      startHand();
+      return;
+    }
+    syncLog();
+    if (handClosing || (state.handOver && shownHoles)) {
+      handClosing = true;
+      render();
+      showPlayAgain();
+      saveMatch();
+      return;
+    }
+    shownBoard = state.board.length;
+    if (state.handOver && state.revealed) {
+      shownHoles = true;
+      finishHand();
+      return;
+    }
+    render();
+    continueHand();
+    saveMatch();
   }
 
   function heroFolded() {
@@ -846,6 +903,7 @@
     syncRoster();
     render();
     showPlayAgain();
+    saveMatch();
   }
 
   function presentBoard(done) {
@@ -991,6 +1049,7 @@
       return;
     }
     render();
+    saveMatch();
     continueHand();
   }
 
@@ -1052,6 +1111,7 @@
     marker("Nova mão · dealer com " + roster[button].name);
     setStatus("Distribuindo as cartas");
     syncLog();
+    saveMatch();
     playDeal(function () {
       pump();
     });
@@ -1059,19 +1119,12 @@
 
   function init() {
     var homeLink = document.querySelector(".table-nav a");
-    var resumeAsNewMatch = takeMatchFlag();
+    var saved = loadMatch();
     document.getElementById("play-bots").addEventListener("click", startMatch);
     document.getElementById("play-friends").addEventListener("click", showUnavailable);
     window.addEventListener("resize", keepHeroVisible);
-    // Reload / bfcache must never bring back the previous cards or pot.
-    window.addEventListener("pageshow", function (event) {
-      if (!event.persisted) return;
-      if (vsBots || (document.getElementById("match") && !document.getElementById("match").hidden)) {
-        startMatch();
-      }
-    });
-    if (homeLink) homeLink.addEventListener("click", clearMatchFlag);
-    if (resumeAsNewMatch) startMatch();
+    if (homeLink) homeLink.addEventListener("click", clearMatchSave);
+    if (saved && saved.vsBots && saved.roster) resumeMatch(saved);
     else showModeSelect();
   }
 
