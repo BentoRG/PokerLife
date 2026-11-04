@@ -153,6 +153,21 @@ main {
   line-height: 1.16;
 }
 
+.ranking {
+  width: min(32.875rem, calc(100vw - 2.5rem));
+  max-width: calc(100vw - 2.5rem);
+  margin: 1.15rem 0 0;
+  padding-left: 1.5rem;
+  text-align: left;
+  font-size: 1.39rem;
+  line-height: 1.25;
+  list-style-position: outside;
+}
+
+.ranking li + li {
+  margin-top: 0.2rem;
+}
+
 .login-header {
   display: flex;
   align-items: flex-start;
@@ -859,6 +874,7 @@ main {
   .allowance,
   .allowance-claim,
   .story,
+  .ranking,
   .menu,
   .auth-block,
   .mode-select,
@@ -875,7 +891,8 @@ main {
     overflow-wrap: anywhere;
   }
 
-  .story {
+  .story,
+  .ranking {
     font-size: 1.08rem;
     line-height: 1.3;
   }

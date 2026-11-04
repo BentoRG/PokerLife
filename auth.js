@@ -513,6 +513,28 @@
 
   var allowanceTicking = false;
 
+  function paintRanking() {
+    var list = document.querySelector(".ranking");
+    var accounts;
+    var ranked;
+    var i;
+    var item;
+    var account;
+    if (!list) return;
+    list.textContent = "";
+    accounts = readAccounts();
+    ranked = accounts.slice().sort(function (a, b) {
+      return accountMoney(b) - accountMoney(a);
+    });
+    for (i = 0; i < ranked.length; i += 1) {
+      account = ranked[i];
+      if (!account || typeof account.username !== "string" || !account.username.trim()) continue;
+      item = document.createElement("li");
+      item.textContent = account.username.trim() + " ($" + accountMoney(account) + ")";
+      list.appendChild(item);
+    }
+  }
+
   function paintAccount() {
     var name = currentUser();
     var welcome = document.querySelector(".welcome-name");
@@ -523,12 +545,14 @@
     paintBalance();
     paintAllowance();
     paintProfile();
+    paintRanking();
     if (button && !button.dataset.bound) {
       button.dataset.bound = "1";
       button.addEventListener("click", function () {
         if (!claimAllowance()) return;
         paintBalance();
         paintAllowance();
+        paintRanking();
       });
     }
     if (!allowanceTicking && document.querySelector(".allowance")) {
