@@ -426,16 +426,32 @@
     return owned;
   }
 
-  function pushLedger(account, delta, label) {
+  function pushLedger(account, delta, label, detail) {
     var amount = Math.round(delta);
+    var row;
     if (!amount || !label) return;
     if (!Array.isArray(account.ledger)) account.ledger = [];
-    account.ledger.push({ delta: amount, label: label });
+    row = { delta: amount, label: label };
+    if (detail && amount > 0 && Array.isArray(detail.cards) && detail.cards.length) {
+      row.cards = detail.cards.map(function (card) {
+        return String(card);
+      });
+      if (detail.hand) row.hand = String(detail.hand);
+    }
+    account.ledger.push(row);
     if (account.ledger.length > 100) account.ledger.splice(0, account.ledger.length - 100);
   }
 
   function ledgerText(delta, label) {
     return (delta > 0 ? "+" : "-") + "$" + Math.abs(delta) + " → " + label;
+  }
+
+  function ledgerWinDetailText(entry) {
+    var cards;
+    if (!entry || !Array.isArray(entry.cards) || !entry.cards.length) return "";
+    cards = entry.cards.join(" ");
+    if (entry.hand) return entry.hand + ": " + cards;
+    return cards;
   }
 
   function startOfLocalDay(ms) {
@@ -641,14 +657,15 @@
     if (previousMoney > 0 && nextMoney <= 0) applyBrokePenalty(account);
   }
 
-  function setMoney(amount, label) {
+  function setMoney(amount, label, detail) {
     var next = Math.round(Number(amount));
     if (!isFinite(next)) return;
     next = Math.max(0, next);
     updateAccount(function (account) {
       var prev = accountMoney(account);
+      var delta = next - prev;
       account.money = next;
-      if (label) pushLedger(account, next - prev, label);
+      if (label) pushLedger(account, delta, label, delta > 0 ? detail : null);
       maybeBroke(account, prev, next);
     });
   }
@@ -1178,6 +1195,7 @@
     var i;
     var entry;
     var line;
+    var detail;
     var toggle;
     if (!box) return;
     box.textContent = "";
@@ -1189,10 +1207,39 @@
     }
     visible = ledgerExpanded ? valid : valid.slice(0, LEDGER_PREVIEW);
     for (i = 0; i < visible.length; i += 1) {
+      entry = visible[i];
       line = document.createElement("p");
       line.className = "ledger";
-      line.textContent = ledgerText(visible[i].delta, visible[i].label);
-      box.appendChild(line);
+      line.textContent = ledgerText(entry.delta, entry.label);
+      if (entry.delta > 0 && Array.isArray(entry.cards) && entry.cards.length) {
+        line.className += " ledger-win";
+        line.setAttribute("role", "button");
+        line.setAttribute("tabindex", "0");
+        line.setAttribute("aria-expanded", "false");
+        line.title = "Ver cartas da mão";
+        detail = document.createElement("p");
+        detail.className = "ledger-detail";
+        detail.hidden = true;
+        detail.textContent = ledgerWinDetailText(entry);
+        (function (row, panel) {
+          function toggleDetail() {
+            var open = panel.hidden;
+            panel.hidden = !open;
+            row.setAttribute("aria-expanded", open ? "true" : "false");
+          }
+          row.addEventListener("click", toggleDetail);
+          row.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleDetail();
+            }
+          });
+        })(line, detail);
+        box.appendChild(line);
+        box.appendChild(detail);
+      } else {
+        box.appendChild(line);
+      }
     }
     if (valid.length > LEDGER_PREVIEW) {
       toggle = document.createElement("button");

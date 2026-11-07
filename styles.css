@@ -605,6 +605,26 @@ main {
   margin-top: 0.15rem;
 }
 
+.account-card .ledger-win {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.account-card .ledger-win:hover {
+  color: #222;
+}
+
+.account-card .ledger-detail {
+  margin: 0.05rem 0 0.35rem 0.55rem;
+  font-size: 0.98rem;
+  color: #333;
+}
+
+.account-card .ledger-detail[hidden] {
+  display: none;
+}
+
 .ledger-toggle {
   display: inline-block;
   margin: 0.55rem 0 0;

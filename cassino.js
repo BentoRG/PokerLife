@@ -769,13 +769,40 @@
     );
   }
 
+  function localPokerLedgerDetail() {
+    var localId = null;
+    var i;
+    var payout;
+    var cards;
+    if (!state || !Array.isArray(state.payouts)) return null;
+    for (i = 0; i < state.players.length; i += 1) {
+      if (isLocalPlayer(state.players[i])) {
+        localId = state.players[i].id;
+        break;
+      }
+    }
+    if (!localId) return null;
+    for (i = 0; i < state.payouts.length; i += 1) {
+      payout = state.payouts[i];
+      if (!payout || payout.playerId !== localId) continue;
+      if (!(payout.amount > 0) || payout.refund) continue;
+      if (!Array.isArray(payout.cards) || !payout.cards.length) continue;
+      cards = payout.cards.map(cardLabel);
+      return {
+        hand: HANDS[payout.hand] || payout.hand || "",
+        cards: cards,
+      };
+    }
+    return null;
+  }
+
   function syncLocalMoneyFromRoster() {
     var api = auth();
     var i;
     if (!api || !roster || !localPlayerId) return;
     for (i = 0; i < roster.length; i += 1) {
       if (roster[i].id === localPlayerId) {
-        api.setMoney(roster[i].stack, vsFriends ? "partida com amigos" : "partida de poker");
+        api.setMoney(roster[i].stack, "poker", localPokerLedgerDetail());
         return;
       }
     }
@@ -1769,7 +1796,7 @@
     }
     for (i = 0; i < roster.length; i += 1) {
       if (roster[i].isHuman) {
-        window.PokerLifeAuth.setMoney(roster[i].stack, "partida de poker");
+        window.PokerLifeAuth.setMoney(roster[i].stack, "poker", localPokerLedgerDetail());
         return;
       }
     }
