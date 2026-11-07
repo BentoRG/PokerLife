@@ -348,10 +348,126 @@
     return choice;
   }
 
+  function usedCardSet(table, player) {
+    var used = {};
+    (player.hole || []).forEach(function (card) {
+      used[card] = true;
+    });
+    (table.board || []).forEach(function (card) {
+      used[card] = true;
+    });
+    return used;
+  }
+
+  function remainingDeck(table, player) {
+    var used = usedCardSet(table, player);
+    var deck = [];
+    var ranks = "23456789TJQKA";
+    var suits = "shdc";
+    var r;
+    var s;
+    var card;
+    for (r = 0; r < ranks.length; r += 1) {
+      for (s = 0; s < suits.length; s += 1) {
+        card = ranks.charAt(r) + suits.charAt(s);
+        if (!used[card]) deck.push(card);
+      }
+    }
+    return deck;
+  }
+
+  function comboLooksStrong(hole, board) {
+    var made;
+    var cards;
+    var draw;
+    if (!board.length) return chen(hole[0], hole[1]) >= 8;
+    made = Poker.rankCards(hole.concat(board));
+    if (!made) return false;
+    if (made[0] >= 2) return true;
+    if (made[0] === 1) return made[1] >= 10;
+    if (board.length >= 5) return false;
+    cards = hole.concat(board);
+    if (hasFlushDraw(cards)) return true;
+    draw = straightDraw(cards);
+    return !!(draw.openEnded || draw.gutshot);
+  }
+
+  // Bayes: P(strong hand | this bet size) vs P(bluff), from remaining combos and bet sizing.
+  function estimateBetMeaning(table, player, legal) {
+    var call = legal && legal.call > 0 ? legal.call : 0;
+    var pot = Poker.potSize(table);
+    var sizeRatio = call > 0 ? call / Math.max(pot, table.bb) : 0;
+    var deck;
+    var i;
+    var j;
+    var strong = 0;
+    var total = 0;
+    var priorStrong;
+    var priorWeak;
+    var betGivenStrong;
+    var betGivenWeak;
+    var pBet;
+    var valueChance;
+    if (call <= 0) {
+      return { valueChance: 0, bluffChance: 1, sizeRatio: 0, priorStrong: 0 };
+    }
+    deck = remainingDeck(table, player);
+    for (i = 0; i < deck.length; i += 1) {
+      for (j = i + 1; j < deck.length; j += 1) {
+        total += 1;
+        if (comboLooksStrong([deck[i], deck[j]], table.board)) strong += 1;
+      }
+    }
+    priorStrong = total > 0 ? strong / total : 0.25;
+    priorWeak = 1 - priorStrong;
+    // Bigger bets are more often value; huge overbets stay polarized (some bluffs remain).
+    betGivenStrong = clamp(0.48 + sizeRatio * 0.36, 0.5, 0.94);
+    betGivenWeak = clamp(0.2 - sizeRatio * 0.07, 0.035, 0.2);
+    if (sizeRatio > 1) betGivenWeak += Math.min(0.14, (sizeRatio - 1) * 0.09);
+    pBet = betGivenStrong * priorStrong + betGivenWeak * priorWeak;
+    valueChance = pBet > 0 ? (betGivenStrong * priorStrong) / pBet : priorStrong;
+    valueChance = clamp(valueChance, 0.08, 0.95);
+    return {
+      valueChance: valueChance,
+      bluffChance: 1 - valueChance,
+      sizeRatio: sizeRatio,
+      priorStrong: priorStrong,
+    };
+  }
+
+  // Facing a big bet, fold more when value is likely; still call sometimes as a bluff-catch.
+  function withBigBetFear(choice, table, legal, player) {
+    var meaning;
+    var score;
+    var pot;
+    var price;
+    var needed;
+    var fear;
+    if (!choice || !legal || !(legal.call > 0) || !legal.fold) return choice;
+    if (choice.type !== "call" && choice.type !== "raise") return choice;
+    meaning = estimateBetMeaning(table, player, legal);
+    // Ignore small probes; fear only kicks in on meaningfully large bets.
+    if (meaning.sizeRatio < 0.4 && legal.call < table.bb * 4) return choice;
+    score = strength(player, table);
+    pot = Poker.potSize(table);
+    price = legal.call / (pot + legal.call);
+    needed = price * (0.55 + meaning.valueChance * 0.95);
+    if (score >= Math.max(needed, meaning.valueChance * 0.7) + 0.04) return choice;
+    if (score >= price && Math.random() < meaning.bluffChance * 0.7) {
+      return choice.type === "raise" ? { type: "call" } : choice;
+    }
+    fear = meaning.valueChance * clamp((meaning.sizeRatio - 0.3) / 1.05, 0.2, 1);
+    if (Math.random() < fear) return { type: "fold" };
+    if (choice.type === "raise" && Math.random() < fear * 0.85) return { type: "call" };
+    return choice;
+  }
+
   function chooseBot(table) {
     var legal = Poker.legalActions(table);
     var player = table.players[table.toAct];
-    return withMoneyFear(chooseByStyle(styleOf(player), table, legal, player), table, legal, player);
+    var choice = chooseByStyle(styleOf(player), table, legal, player);
+    choice = withBigBetFear(choice, table, legal, player);
+    return withMoneyFear(choice, table, legal, player);
   }
 
   function later(fn, ms) {
@@ -1270,5 +1386,12 @@
     else init();
   }
 
-  if (typeof module !== "undefined" && module.exports) module.exports = { chooseBot: chooseBot };
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      chooseBot: chooseBot,
+      estimateBetMeaning: estimateBetMeaning,
+      withBigBetFear: withBigBetFear,
+      comboLooksStrong: comboLooksStrong,
+    };
+  }
 })();
