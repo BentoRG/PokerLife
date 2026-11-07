@@ -77,7 +77,13 @@
   // Friends match: host runs the engine; guests publish actions and poll shared room state.
   var FRIENDS_SB = 10;
   var FRIENDS_BB = 20;
-  var MAX_FRIENDS = 6;
+  var MAX_FRIENDS = 5;
+  var FRIEND_BOTS = [
+    { id: "lia", name: "Bot 1" },
+    { id: "caio", name: "Bot 2" },
+    { id: "duda", name: "Bot 3" },
+    { id: "ravi", name: "Bot 4" },
+  ];
   var ROOM_POLL_MS = 2500;
   var roomCode = null;
   var room = null;
@@ -657,6 +663,36 @@
     return !!player.isHuman;
   }
 
+  function isBotPlayer(player) {
+    return !!(player && player.isHuman === false);
+  }
+
+  function mapRoomPlayer(player) {
+    return {
+      id: player.id,
+      name: player.name,
+      stack: player.stack,
+      left: !!player.left,
+      isHuman: !isBotPlayer(player),
+    };
+  }
+
+  // Rotate seats so the viewing player always sits in s0 (below the board).
+  function localLogicalSeat() {
+    var i;
+    if (!state || !state.players) return 0;
+    for (i = 0; i < state.players.length; i += 1) {
+      if (isLocalPlayer(state.players[i])) return i;
+    }
+    return 0;
+  }
+
+  function visualSeatIndex(logicalIndex) {
+    var count = state && state.players ? state.players.length : 0;
+    if (count <= 0) return logicalIndex;
+    return (logicalIndex - localLogicalSeat() + count) % count;
+  }
+
   function stopRoomPoll() {
     if (roomPollTimer) {
       clearInterval(roomPollTimer);
@@ -902,8 +938,9 @@
     return false;
   }
 
-  function renderSeat(player, index, opts, winners) {
-    var className = "seat s" + index;
+  function renderSeat(player, logicalIndex, opts, winners) {
+    var visualIndex = visualSeatIndex(logicalIndex);
+    var className = "seat s" + visualIndex;
     var seat;
     var heading;
     var chips;
@@ -915,12 +952,12 @@
     opts = opts || {};
     winners = winners || {};
     payout = winners[player.id];
-    if (index === state.toAct) className += " acting";
+    if (logicalIndex === state.toAct) className += " acting";
     if (player.folded) className += " folded";
     if (payout) className += " winner";
     seat = el("article", className);
     heading = el("div", "seat-heading");
-    chips = seatRoleChips(index);
+    chips = seatRoleChips(logicalIndex);
     heading.appendChild(el("p", "seat-name", player.name));
     if (chips) heading.appendChild(chips);
     seat.appendChild(heading);
@@ -1030,22 +1067,47 @@
   function paintRoomPlayers() {
     var list = document.getElementById("room-players");
     var start = document.getElementById("start-friends-game");
+    var addBot = document.getElementById("add-room-bot");
     var display = document.getElementById("room-code-display");
     var players = activeRoomPlayers(room && room.players);
     var i;
     var item;
+    var label;
+    var removeBtn;
     if (display) display.textContent = roomCode || "";
     if (!list) return;
     list.textContent = "";
     for (i = 0; i < players.length; i += 1) {
       item = document.createElement("li");
-      item.textContent =
+      label =
         players[i].name +
         " ($" +
         players[i].stack +
         ")" +
-        (players[i].id === (room && room.hostId) ? " · host" : "");
+        (players[i].id === (room && room.hostId) ? " · host" : "") +
+        (isBotPlayer(players[i]) ? " · bot" : "");
+      item.appendChild(document.createTextNode(label));
+      if (isHost && isBotPlayer(players[i])) {
+        removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "room-remove-bot";
+        removeBtn.textContent = "Remover";
+        removeBtn.setAttribute("data-bot-id", players[i].id);
+        removeBtn.addEventListener("click", function (event) {
+          var id = event.currentTarget.getAttribute("data-bot-id");
+          removeFriendsBot(id);
+        });
+        item.appendChild(removeBtn);
+      }
       list.appendChild(item);
+    }
+    if (addBot) {
+      addBot.hidden = !isHost;
+      addBot.disabled = !(isHost && players.length < MAX_FRIENDS);
+      addBot.textContent =
+        players.length < MAX_FRIENDS
+          ? "Adicionar bot"
+          : "Mesa cheia (máx. " + MAX_FRIENDS + ")";
     }
     if (start) {
       start.hidden = !isHost;
@@ -1053,6 +1115,69 @@
       start.textContent =
         players.length >= 2 ? "Iniciar jogo" : "Aguardando pelo menos 2 jogadores";
     }
+  }
+
+  function nextFriendsBot() {
+    var players = activeRoomPlayers(room && room.players);
+    var used = {};
+    var i;
+    var def;
+    for (i = 0; i < players.length; i += 1) {
+      if (players[i] && players[i].id) used[players[i].id] = true;
+    }
+    for (i = 0; i < FRIEND_BOTS.length; i += 1) {
+      def = FRIEND_BOTS[i];
+      if (!used[def.id]) return def;
+    }
+    return null;
+  }
+
+  function addFriendsBot() {
+    var players;
+    var def;
+    var stack;
+    if (!isHost || !room || room.phase !== "lobby") return;
+    players = activeRoomPlayers(room.players);
+    if (players.length >= MAX_FRIENDS) {
+      showFriendsNotice("A mesa aceita no máximo " + MAX_FRIENDS + " jogadores.");
+      return;
+    }
+    def = nextFriendsBot();
+    if (!def) {
+      showFriendsNotice("Não há mais bots disponíveis.");
+      return;
+    }
+    stack = botStack();
+    room.players = players.concat([
+      {
+        id: def.id,
+        name: def.name,
+        stack: stack,
+        left: false,
+        isHuman: false,
+      },
+    ]);
+    publishRoom(room).then(function () {
+      showFriendsNotice("");
+      paintRoomPlayers();
+    }).catch(function () {
+      showFriendsNotice("Não foi possível adicionar o bot.");
+    });
+  }
+
+  function removeFriendsBot(botId) {
+    var players;
+    if (!isHost || !room || room.phase !== "lobby" || !botId) return;
+    players = activeRoomPlayers(room.players).filter(function (player) {
+      return !(isBotPlayer(player) && player.id === botId);
+    });
+    room.players = players;
+    publishRoom(room).then(function () {
+      showFriendsNotice("");
+      paintRoomPlayers();
+    }).catch(function () {
+      showFriendsNotice("Não foi possível remover o bot.");
+    });
   }
 
   function showFriendsWaiting() {
@@ -1234,23 +1359,21 @@
     var next;
     if (!isHost || !room) return;
     players = activeRoomPlayers(room.players).map(function (player) {
-      return {
-        id: player.id,
-        name: player.name,
-        stack: player.stack,
-        left: false,
-        isHuman: true,
-      };
+      return mapRoomPlayer(player);
     });
     if (players.length < 2) {
       showFriendsNotice("Precisa de pelo menos 2 jogadores.");
+      return;
+    }
+    if (players.length > MAX_FRIENDS) {
+      showFriendsNotice("A mesa aceita no máximo " + MAX_FRIENDS + " jogadores.");
       return;
     }
     roster = players;
     button = players.length - 1;
     matchSb = FRIENDS_SB;
     matchBb = FRIENDS_BB;
-    startStack = players[0].stack;
+    startStack = botStack();
     gameVariant = room.variant === "five-card-draw" ? "five-card-draw" : gameVariant || "holdem";
     next = Object.assign({}, room, {
       phase: "playing",
@@ -1291,12 +1414,7 @@
     matchBb = remote.matchBb || FRIENDS_BB;
     button = typeof remote.button === "number" ? remote.button : 0;
     roster = activeRoomPlayers(remote.players).map(function (player) {
-      return {
-        id: player.id,
-        name: player.name,
-        stack: player.stack,
-        isHuman: true,
-      };
+      return mapRoomPlayer(player);
     });
     clear(document.getElementById("log"));
     logCursor = 0;
@@ -1315,13 +1433,7 @@
 
   function snapshotFriendsRoom() {
     var players = (roster || []).map(function (player) {
-      return {
-        id: player.id,
-        name: player.name,
-        stack: player.stack,
-        left: false,
-        isHuman: true,
-      };
+      return mapRoomPlayer(player);
     });
     return Object.assign({}, room || {}, {
       code: roomCode,
@@ -1356,12 +1468,7 @@
     lastRoomSeq = remote.seq || lastRoomSeq;
     if (Array.isArray(remote.players)) {
       roster = activeRoomPlayers(remote.players).map(function (player) {
-        return {
-          id: player.id,
-          name: player.name,
-          stack: player.stack,
-          isHuman: true,
-        };
+        return mapRoomPlayer(player);
       });
     }
     if (typeof remote.button === "number") button = remote.button;
@@ -1464,7 +1571,7 @@
     if (!changed) return;
     room.players = next;
     roster = next.map(function (entry) {
-      return { id: entry.id, name: entry.name, stack: entry.stack, isHuman: true };
+      return mapRoomPlayer(entry);
     });
     if (roster.length < 2) {
       endFriendsRoom("Jogadores insuficientes. Sala encerrada.");
@@ -1926,7 +2033,7 @@
       }
       step = queue.shift();
       player = state.players[step.index];
-      seatCards = document.querySelector("#table .s" + step.index + " .cards");
+      seatCards = document.querySelector("#table .s" + visualSeatIndex(step.index) + " .cards");
       if (!seatCards) {
         done();
         return;
@@ -2255,7 +2362,7 @@
     function revealSeat(seatIndex, cardIndex, nextSeat) {
       var cards;
       if (!alive()) return;
-      cards = document.querySelectorAll("#table .s" + seatIndex + " .cards .card");
+      cards = document.querySelectorAll("#table .s" + visualSeatIndex(seatIndex) + " .cards .card");
       if (cardIndex >= cards.length) {
         nextSeat();
         return;
@@ -2320,12 +2427,22 @@
     }
     actor = state.players[state.toAct];
     if (isLocalPlayer(actor)) return;
-    if (vsFriends) {
+    if (vsFriends && !isHost) {
+      waitingForRemote = true;
+      return;
+    }
+    if (vsFriends && actor.isHuman) {
       waitingForRemote = true;
       return;
     }
     later(function () {
       if (!state || handClosing || !applyBot()) return;
+      if (vsFriends && isHost) {
+        publishFriendsState().then(function () {
+          pump();
+        });
+        return;
+      }
       pump();
     }, timed(BOT_PAUSE));
   }
@@ -2470,6 +2587,7 @@
     var joinBtn = document.getElementById("join-room");
     var backBtn = document.getElementById("friends-back");
     var startBtn = document.getElementById("start-friends-game");
+    var addBotBtn = document.getElementById("add-room-bot");
     var leaveRoomBtn = document.getElementById("leave-room");
     var leaveMatchBtn = document.getElementById("leave-match");
     document.getElementById("play-bots").addEventListener("click", function () {
@@ -2488,6 +2606,7 @@
     if (joinBtn) joinBtn.addEventListener("click", joinFriendsRoom);
     if (backBtn) backBtn.addEventListener("click", showModeSelect);
     if (startBtn) startBtn.addEventListener("click", startFriendsGame);
+    if (addBotBtn) addBotBtn.addEventListener("click", addFriendsBot);
     if (leaveRoomBtn) leaveRoomBtn.addEventListener("click", leaveFriendsRoom);
     if (leaveMatchBtn) leaveMatchBtn.addEventListener("click", leaveFriendsMatch);
     window.addEventListener("resize", keepHeroVisible);

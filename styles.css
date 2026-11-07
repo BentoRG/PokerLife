@@ -1220,6 +1220,29 @@ main {
   background: #f6f6f6;
 }
 
+.room-players li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.room-remove-bot {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #000;
+  background: #eee;
+  color: #000;
+  font-family: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.room-remove-bot:hover {
+  background: #e2e2e2;
+}
+
 .room-players {
   width: 100%;
   margin: 0;
