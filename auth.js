@@ -9,6 +9,7 @@
   var ALLOWANCE = 100;
   var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
+  var BROKE_ALLOWANCE_CUT = 25;
   var RESET_TOKEN_MS = 2 * 60 * 60 * 1000;
   var GAME_SPEED_KEY = "pokerlife.gameSpeed";
   var GAME_SPEED_SCALES = {
@@ -411,6 +412,21 @@
     return (delta > 0 ? "+" : "-") + "$" + Math.abs(delta) + " → " + label;
   }
 
+  function allowancePenaltyOf(account) {
+    var value = account && account.allowancePenalty;
+    if (typeof value !== "number" || !isFinite(value)) return 0;
+    return Math.max(0, Math.round(value));
+  }
+
+  function applyBrokePenalty(account) {
+    account.allowancePenalty = allowancePenaltyOf(account) + BROKE_ALLOWANCE_CUT;
+    account.brokeAllowanceNotice = BROKE_ALLOWANCE_CUT;
+  }
+
+  function maybeBroke(account, previousMoney, nextMoney) {
+    if (previousMoney > 0 && nextMoney <= 0) applyBrokePenalty(account);
+  }
+
   function setMoney(amount, label) {
     var next = Math.round(Number(amount));
     if (!isFinite(next)) return;
@@ -419,6 +435,7 @@
       var prev = accountMoney(account);
       account.money = next;
       if (label) pushLedger(account, next - prev, label);
+      maybeBroke(account, prev, next);
     });
   }
 
@@ -430,6 +447,7 @@
     if (!updateAccount(function (account) {
       var items = readItems(account);
       var money = accountMoney(account);
+      var next;
       if (items.indexOf(trimmed) !== -1) {
         result = { ok: false, error: "Você já tem esse item." };
         return;
@@ -438,10 +456,12 @@
         result = { ok: false, error: "Dinheiro insuficiente." };
         return;
       }
-      account.money = money - cost;
+      next = money - cost;
+      account.money = next;
       items.push(trimmed);
       account.items = items;
       pushLedger(account, -cost, "compra do item " + trimmed);
+      maybeBroke(account, money, next);
       result = { ok: true, error: "" };
     })) return result;
     return result;
@@ -461,8 +481,10 @@
   }
 
   function allowanceAmount(now) {
+    var account = findAccount(currentUser() || "");
     var start = new Date(allowanceWindowStart(now));
-    return start.getDay() === 0 ? SUNDAY_ALLOWANCE : ALLOWANCE;
+    var base = start.getDay() === 0 ? SUNDAY_ALLOWANCE : ALLOWANCE;
+    return Math.max(0, base - allowancePenaltyOf(account));
   }
 
   function allowanceReady(now) {
@@ -508,6 +530,25 @@
     var node = document.querySelector(".balance");
     if (!node) return;
     node.textContent = "Você tem $" + currentMoney();
+  }
+
+  function paintBrokeNotice() {
+    var node = document.querySelector(".broke-notice");
+    var account;
+    var cut;
+    if (!node) return;
+    account = findAccount(currentUser() || "");
+    cut = account && account.brokeAllowanceNotice;
+    if (typeof cut !== "number" || !isFinite(cut) || cut <= 0) {
+      node.hidden = true;
+      node.textContent = "";
+      return;
+    }
+    node.hidden = false;
+    node.textContent = "Sua mesada foi reduzida em $" + Math.round(cut) + ".";
+    updateAccount(function (entry) {
+      delete entry.brokeAllowanceNotice;
+    });
   }
 
   function paintAllowance() {
@@ -562,6 +603,7 @@
     if (profile && name) profile.textContent = name;
     paintBalance();
     paintAllowance();
+    paintBrokeNotice();
     paintProfile();
     paintRanking();
     if (button && !button.dataset.bound) {
@@ -617,7 +659,12 @@
     if (email) email.textContent = account && account.email ? account.email : "";
     if (money) money.textContent = "$" + currentMoney();
     if (mesada) {
-      mesada.textContent = "$" + ALLOWANCE + " ($" + SUNDAY_ALLOWANCE + " nos Domingos)";
+      mesada.textContent =
+        "$" +
+        Math.max(0, ALLOWANCE - allowancePenaltyOf(account)) +
+        " ($" +
+        Math.max(0, SUNDAY_ALLOWANCE - allowancePenaltyOf(account)) +
+        " nos Domingos)";
     }
     paintItems(account);
     paintLedger(account);
