@@ -56,6 +56,9 @@
   var NOTICE_MS = 3200;
   // Bot 4 picks one of the other three personalities at random each hand.
   var raviStyle = null;
+  // Bot 3 (maniac): wild big-bet mood on 1 of 5 hands; otherwise plays normally.
+  var maniacWildHand = false;
+  var maniacFired = false;
   // Stack bots started the match with; used so richer bots fold less and poorer ones fold more.
   var startStack = START;
   // Blinds fixed when the player enters the cassino (3% of their money for the big blind).
@@ -83,6 +86,8 @@
           handClosing: handClosing,
           statusMessage: statusMessage,
           raviStyle: raviStyle,
+          maniacWildHand: maniacWildHand,
+          maniacFired: maniacFired,
           startStack: startStack,
           matchSb: matchSb,
           matchBb: matchBb,
@@ -214,6 +219,11 @@
     raviStyle = STYLES[Math.floor(Math.random() * STYLES.length)];
   }
 
+  function pickManiacMood() {
+    maniacWildHand = Math.random() < 0.2;
+    maniacFired = false;
+  }
+
   function styleOf(player) {
     if (player.id === "lia") return "calling-station";
     if (player.id === "caio") return "bluffer";
@@ -319,20 +329,39 @@
     return chooseSkillful(table, legal, player);
   }
 
-  // Bot 3: frequent oversized bets and all-ins.
+  // Best street to fire a huge bet: monsters act sooner; medium value waits for later streets.
+  function maniacShouldFire(table, score, made) {
+    var boardLen = table.board.length;
+    var category = made && made[0] != null ? made[0] : 0;
+    var chance;
+    if (maniacFired) return false;
+    if (category >= 6) chance = boardLen === 3 ? 0.9 : boardLen === 4 ? 0.85 : 0.95;
+    else if (category >= 4) chance = boardLen === 3 ? 0.35 : boardLen === 4 ? 0.7 : 0.88;
+    else if (category >= 2 || score >= 0.78) chance = boardLen === 3 ? 0.22 : boardLen === 4 ? 0.55 : 0.75;
+    else return false;
+    // Prefer spots that extract value: checked to us, or only a small bet to raise.
+    if (table.currentBet === 0) chance += 0.12;
+    else if (table.currentBet <= table.bb * 3) chance += 0.08;
+    else chance -= 0.15;
+    return Math.random() < clamp(chance, 0.08, 0.96);
+  }
+
+  // Bot 3: normal play 4/5 hands; on the wild hand, oversized bets only postflop, all-in only with monsters.
   function chooseManiac(table, legal, player) {
-    var score = strength(player, table);
-    if (legal.minRaiseTo != null && (score >= 0.4 || Math.random() < 0.58)) {
-      if (Math.random() < 0.48) return { type: "raise", to: legal.maxRaiseTo };
-      return { type: "raise", to: sizedBet(table, legal, 1.4) };
+    var score;
+    var made;
+    var allInWorthy;
+    if (!maniacWildHand) return chooseSkillful(table, legal, player);
+    if (!table.board.length) return chooseSkillful(table, legal, player);
+    score = strength(player, table);
+    made = Poker.rankCards(player.hole.concat(table.board));
+    allInWorthy = score >= 0.88 || (made && made[0] >= 5);
+    if (legal.minRaiseTo != null && maniacShouldFire(table, score, made)) {
+      maniacFired = true;
+      if (allInWorthy && Math.random() < 0.7) return { type: "raise", to: legal.maxRaiseTo };
+      return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.45 ? 1.2 : 1.65) };
     }
-    if (legal.call > 0) {
-      if (score >= 0.28) return { type: "call" };
-      return legal.fold ? { type: "fold" } : { type: "call" };
-    }
-    if (legal.check) return { type: "check" };
-    if (legal.fold) return { type: "fold" };
-    return { type: "check" };
+    return chooseSkillful(table, legal, player);
   }
 
   function chooseByStyle(style, table, legal, player) {
@@ -810,6 +839,8 @@
     matchBb = saved.matchBb > 0 ? saved.matchBb : blindsForMoney(heroMoney()).bb;
     raviStyle = STYLES.indexOf(saved.raviStyle) >= 0 ? saved.raviStyle : null;
     if (!raviStyle) pickRaviStyle();
+    maniacWildHand = !!saved.maniacWildHand;
+    maniacFired = !!saved.maniacFired;
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
@@ -1391,6 +1422,7 @@
     shownHoles = false;
     handClosing = false;
     pickRaviStyle();
+    pickManiacMood();
     if (actions) clear(actions);
     if (raiseBox) raiseBox.remove();
     document.documentElement.style.removeProperty("--dock-height");
