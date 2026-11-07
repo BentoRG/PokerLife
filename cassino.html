@@ -23,19 +23,119 @@
     </header>
 
     <main class="table-main">
-      <div id="mode-select" class="mode-select">
-        <button type="button" id="play-bots">Jogar Texas Hold'em com bots</button>
-        <button type="button" id="play-friends" aria-disabled="true">Jogar Texas Hold'em com amigos</button>
-        <p id="mode-notice" class="mode-notice" hidden role="status"></p>
-      </div>
-      <div id="match" hidden>
-        <div id="table" class="felt"></div>
-        <div class="controls">
-          <div id="actions" class="actions"></div>
+      <div class="cassino-layout">
+        <div class="cassino-play">
+          <div id="mode-select" class="mode-select">
+            <button type="button" id="play-bots">Jogar Texas Hold'em com bots</button>
+            <button type="button" id="play-friends" aria-disabled="true">Jogar Texas Hold'em com amigos</button>
+            <p id="mode-notice" class="mode-notice" hidden role="status"></p>
+          </div>
+          <div id="match" hidden>
+            <div id="table" class="felt"></div>
+            <div class="controls">
+              <div id="actions" class="actions"></div>
+            </div>
+            <ol id="log" class="hand-log" aria-live="polite"></ol>
+          </div>
+          <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
         </div>
-        <ol id="log" class="hand-log" aria-live="polite"></ol>
+
+        <aside class="hand-guide" aria-label="Combinações do poker, da pior à melhor">
+          <h2>Combinações</h2>
+          <p class="hand-guide-note">Da pior à melhor</p>
+          <ol class="hand-guide-list">
+            <li>
+              <span class="hand-guide-name">Carta alta</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card"><span class="rank">A</span><span class="suit">♠</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Pares</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">10</span><span class="suit">♥</span></span>
+                <span class="card"><span class="rank">10</span><span class="suit">♣</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Dois pares</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">J</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">J</span><span class="suit">♦</span></span>
+                <span class="card"><span class="rank">8</span><span class="suit">♠</span></span>
+                <span class="card"><span class="rank">8</span><span class="suit">♣</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Trinca</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">9</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">9</span><span class="suit">♦</span></span>
+                <span class="card"><span class="rank">9</span><span class="suit">♣</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Sequência</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card"><span class="rank">5</span><span class="suit">♠</span></span>
+                <span class="card red"><span class="rank">6</span><span class="suit">♥</span></span>
+                <span class="card"><span class="rank">7</span><span class="suit">♣</span></span>
+                <span class="card red"><span class="rank">8</span><span class="suit">♦</span></span>
+                <span class="card"><span class="rank">9</span><span class="suit">♠</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Flush</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">A</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">K</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">Q</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">9</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">3</span><span class="suit">♥</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Full house</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card"><span class="rank">K</span><span class="suit">♠</span></span>
+                <span class="card red"><span class="rank">K</span><span class="suit">♥</span></span>
+                <span class="card"><span class="rank">K</span><span class="suit">♣</span></span>
+                <span class="card"><span class="rank">2</span><span class="suit">♠</span></span>
+                <span class="card red"><span class="rank">2</span><span class="suit">♦</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Quadra</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">7</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">7</span><span class="suit">♦</span></span>
+                <span class="card"><span class="rank">7</span><span class="suit">♣</span></span>
+                <span class="card"><span class="rank">7</span><span class="suit">♠</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Straight flush</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card"><span class="rank">5</span><span class="suit">♠</span></span>
+                <span class="card"><span class="rank">6</span><span class="suit">♠</span></span>
+                <span class="card"><span class="rank">7</span><span class="suit">♠</span></span>
+                <span class="card"><span class="rank">8</span><span class="suit">♠</span></span>
+                <span class="card"><span class="rank">9</span><span class="suit">♠</span></span>
+              </span>
+            </li>
+            <li>
+              <span class="hand-guide-name">Royal flush</span>
+              <span class="cards" aria-hidden="true">
+                <span class="card red"><span class="rank">10</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">J</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">Q</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">K</span><span class="suit">♥</span></span>
+                <span class="card red"><span class="rank">A</span><span class="suit">♥</span></span>
+              </span>
+            </li>
+          </ol>
+        </aside>
       </div>
-      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
     </main>
 
     <script src="poker.js"></script>
