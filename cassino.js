@@ -728,6 +728,7 @@
     clear(document.getElementById("log"));
     hideNotice();
     document.getElementById("match").hidden = true;
+    document.getElementById("hand-guide").hidden = true;
     document.getElementById("mode-select").hidden = false;
   }
 
@@ -788,6 +789,7 @@
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
+    document.getElementById("hand-guide").hidden = false;
     startHand();
   }
 
@@ -811,6 +813,7 @@
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
+    document.getElementById("hand-guide").hidden = false;
     clear(document.getElementById("log"));
     if (!roster || !roster.length) {
       showModeSelect();

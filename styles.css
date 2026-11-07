@@ -343,7 +343,7 @@ main {
 .hand-guide {
   position: absolute;
   top: 0.35rem;
-  right: 0;
+  right: 0.85rem;
   z-index: 1;
   width: 15.5rem;
   padding: 0.85rem 0.75rem 1rem;
@@ -958,6 +958,7 @@ main {
 
 .mode-select[hidden],
 #match[hidden],
+#hand-guide[hidden],
 .mode-notice[hidden] {
   display: none;
 }
