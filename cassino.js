@@ -7,6 +7,17 @@
   var DEAL_TRAVEL = 640;
   var REVEAL_OUT = 460;
   var REVEAL_IN = 560;
+
+  function speedScale() {
+    if (typeof window !== "undefined" && window.PokerLifeAuth && window.PokerLifeAuth.gameSpeedScale) {
+      return window.PokerLifeAuth.gameSpeedScale();
+    }
+    return 1;
+  }
+
+  function timed(ms) {
+    return Math.max(40, Math.round(ms * speedScale()));
+  }
   var HANDS = {
     "royal-flush": "um royal flush",
     "straight-flush": "um straight flush",
@@ -700,7 +711,7 @@
     notice.hidden = false;
     notice.textContent = "essa funcionalidade ainda nao foi aplicada";
     clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(hideNotice, NOTICE_MS);
+    noticeTimer = setTimeout(hideNotice, timed(NOTICE_MS));
   }
 
   function showModeSelect() {
@@ -901,7 +912,7 @@
     node.animate([
       { transform: "scaleX(1)" },
       { transform: "scaleX(0)" }
-    ], { duration: REVEAL_OUT, easing: "ease-in", fill: "forwards" }).onfinish = function () {
+    ], { duration: timed(REVEAL_OUT), easing: "ease-in", fill: "forwards" }).onfinish = function () {
       var flipIn;
       if (!alive()) return;
       face = cardNode(card, false);
@@ -913,7 +924,7 @@
       flipIn = face.animate([
         { transform: "scaleX(0)" },
         { transform: "scaleX(1)" }
-      ], { duration: REVEAL_IN, easing: "ease-out", fill: "both" });
+      ], { duration: timed(REVEAL_IN), easing: "ease-out", fill: "both" });
       flipIn.onfinish = function () {
         finish();
       };
@@ -971,7 +982,7 @@
       travel = node.animate([
         { transform: "translate(" + dx + "px, " + dy + "px) scale(0.82)", opacity: 0.35 },
         { transform: "translate(0px, 0px) scale(1)", opacity: 1 }
-      ], { duration: DEAL_TRAVEL, easing: "ease-out", fill: "both" });
+      ], { duration: timed(DEAL_TRAVEL), easing: "ease-out", fill: "both" });
       travel.onfinish = function () {
         if (!alive()) return;
         if (!player.isHuman) {
@@ -1293,14 +1304,14 @@
         if (!state || handClosing) return;
         Poker.advance(state);
         pump();
-      }, STREET_PAUSE);
+      }, timed(STREET_PAUSE));
       return;
     }
     if (state.players[state.toAct].isHuman) return;
     later(function () {
       if (!state || handClosing || !applyBot()) return;
       pump();
-    }, BOT_PAUSE);
+    }, timed(BOT_PAUSE));
   }
 
   function applyBot() {

@@ -10,6 +10,14 @@
   var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
   var RESET_TOKEN_MS = 2 * 60 * 60 * 1000;
+  var GAME_SPEED_KEY = "pokerlife.gameSpeed";
+  var GAME_SPEED_SCALES = {
+    "muito-lenta": 2,
+    lenta: 1.45,
+    normal: 1,
+    rapida: 0.55,
+    "muito-rapida": 0.28,
+  };
   var syncing = null;
 
   function pageName() {
@@ -571,6 +579,34 @@
     }
   }
 
+  function readGameSpeed() {
+    try {
+      var value = localStorage.getItem(GAME_SPEED_KEY) || "normal";
+      if (!Object.prototype.hasOwnProperty.call(GAME_SPEED_SCALES, value)) return "normal";
+      return value;
+    } catch (error) {
+      return "normal";
+    }
+  }
+
+  function writeGameSpeed(value) {
+    if (!Object.prototype.hasOwnProperty.call(GAME_SPEED_SCALES, value)) value = "normal";
+    try {
+      localStorage.setItem(GAME_SPEED_KEY, value);
+    } catch (error) {}
+    return value;
+  }
+
+  function gameSpeedScale() {
+    return GAME_SPEED_SCALES[readGameSpeed()] || 1;
+  }
+
+  function paintGameSpeed() {
+    var select = document.querySelector("#game-speed");
+    if (!select) return;
+    select.value = readGameSpeed();
+  }
+
   function paintProfile() {
     var account = findAccount(currentUser() || "");
     var user = document.querySelector(".account-username");
@@ -585,6 +621,7 @@
     }
     paintItems(account);
     paintLedger(account);
+    paintGameSpeed();
   }
 
   function paintItems(account) {
@@ -789,40 +826,17 @@
   }
 
   function bindAccountForms() {
-    var changePassword = document.querySelector("#change-password");
-    var resetStatus = document.querySelector(".password-reset-status");
-    var emailForm = document.querySelector("#email-form");
     var logout = document.querySelector("#logout");
-    if (changePassword) {
-      changePassword.addEventListener("click", function () {
-        changePassword.disabled = true;
-        showStatusMessage(resetStatus, "Enviando email…", false);
-        requestPasswordReset().then(function (message) {
-          changePassword.disabled = false;
-          if (message) {
-            showStatusMessage(resetStatus, message, false);
-            return;
-          }
-          showStatusMessage(
-            resetStatus,
-            "Enviamos um email para a conta. Abra o link e digite a nova senha duas vezes.",
-            true
-          );
-        });
-      });
-    }
-    if (emailForm) {
-      emailForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        var data = new FormData(emailForm);
-        var message = changeEmail(String(data.get("email") || ""));
-        if (message) {
-          showFormMessage(emailForm, message, false);
-          return;
+    var speedSelect = document.querySelector("#game-speed");
+    var speedHint = document.querySelector("#speed-hint");
+    if (speedSelect) {
+      speedSelect.addEventListener("change", function () {
+        writeGameSpeed(speedSelect.value);
+        if (speedHint) {
+          speedHint.hidden = false;
+          speedHint.classList.add("form-success");
+          speedHint.textContent = "Velocidade salva. Vale para a próxima mão no cassino.";
         }
-        emailForm.reset();
-        showFormMessage(emailForm, "Email alterado.", true);
-        paintProfile();
       });
     }
     if (logout) {
@@ -877,6 +891,9 @@
     items: function () {
       return readItems(findAccount(currentUser() || "")).slice();
     },
+    gameSpeed: readGameSpeed,
+    setGameSpeed: writeGameSpeed,
+    gameSpeedScale: gameSpeedScale,
   };
 
   function showError(form, message) {

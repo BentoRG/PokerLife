@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="auth.js"></script>
-    <title>Sua conta — PokerLife</title>
+    <title>Configurações & Seu Perfil — PokerLife</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,28 +19,29 @@
         <h1>PokerLife</h1>
         <p class="subtitle">A vida até o que um herdeiro conhece</p>
       </div>
-      <p class="login-title">Sua Conta</p>
+      <p class="login-title">Configurações & Seu Perfil</p>
     </header>
 
     <main class="table-main">
       <section class="account-card">
         <p>Nome de usuário: <span class="account-username"></span></p>
-        <p>
-          Email: <span class="account-email"></span>
-          <button type="button" class="email-change" id="change-email">(trocar email)</button>
-        </p>
-        <form id="email-form" class="email-swap" hidden>
-          <div class="field-stack">
-            <input type="email" name="email" autocomplete="email" placeholder="Email novo" required />
-            <button type="submit">Mudar</button>
-          </div>
-          <p class="form-error" role="alert" hidden></p>
-        </form>
+        <p>Email: <span class="account-email"></span></p>
 
-        <p>
-          <button type="button" class="email-change" id="change-password">(trocar senha)</button>
+        <h2>Velocidade do jogo</h2>
+        <p class="settings-note">
+          Controla o tempo da distribuição das cartas, das apostas dos bots e das revelações.
         </p>
-        <p class="form-error password-reset-status" role="alert" hidden></p>
+        <label class="speed-control">
+          <span class="speed-control-label">Ritmo</span>
+          <select id="game-speed" name="game-speed" aria-describedby="speed-hint">
+            <option value="muito-lenta">Muito lenta</option>
+            <option value="lenta">Lenta</option>
+            <option value="normal">Normal</option>
+            <option value="rapida">Rápida</option>
+            <option value="muito-rapida">Muito rápida</option>
+          </select>
+        </label>
+        <p id="speed-hint" class="settings-hint" hidden></p>
 
         <h2>Seus itens:</h2>
         <ul class="account-items"></ul>
@@ -56,13 +57,5 @@
 
       <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
     </main>
-
-    <script>
-      document.getElementById("change-email").addEventListener("click", function () {
-        var form = document.getElementById("email-form");
-        form.hidden = false;
-        form.querySelector("input").focus();
-      });
-    </script>
   </body>
 </html>
