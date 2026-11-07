@@ -489,6 +489,13 @@ main {
   text-align: right;
 }
 
+/* Keep the home link clear of the absolute Combinações panel on desktop. */
+@media (min-width: 1101px) {
+  .cassino-layout:has(#hand-guide:not([hidden])) .table-nav {
+    margin-right: calc(15.5rem + 1.7rem);
+  }
+}
+
 .shop-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 11.5rem));
