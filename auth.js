@@ -917,11 +917,6 @@
     return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
   }
 
-  function paintBankMoney() {
-    var node = document.querySelector(".bank-money");
-    if (node) node.textContent = "$" + currentMoney();
-  }
-
   function paintSavingsList(account) {
     var box = document.querySelector(".savings-list");
     var list;
@@ -996,7 +991,6 @@
     if (!document.querySelector(".bank-card")) return;
     ensureSavingsSettled();
     account = findAccount(currentUser() || "");
-    paintBankMoney();
     paintSavingsList(account);
     paintLoanPanel(account);
     paintLedger(account);

@@ -625,10 +625,6 @@ main {
   outline-offset: 2px;
 }
 
-.bank-card .bank-balance {
-  margin: 0;
-}
-
 .bank-form {
   display: grid;
   gap: 0.65rem;
