@@ -24,6 +24,10 @@
     "muito-rapida": 0.28,
   };
   var RANKING_SNAP_KEY = "pokerlife.ranking.order";
+  // Usernames removed on purpose; keep them out of merges, login, and the home ranking.
+  var REMOVED_USERNAMES = {
+    plain: true,
+  };
   var syncing = null;
   var lastPaintedRankingSig = null;
 
@@ -143,11 +147,20 @@
     });
   }
 
+  function isRemovedUsername(username) {
+    var key = String(username || "")
+      .trim()
+      .toLowerCase();
+    return !!(key && REMOVED_USERNAMES[key]);
+  }
+
   function cleanAccounts(accounts) {
     var list = Array.isArray(accounts) ? accounts : [];
     list = list.filter(function (account) {
       if (!account || typeof account.username !== "string") return false;
-      return !!account.username.trim();
+      if (!account.username.trim()) return false;
+      if (isRemovedUsername(account.username)) return false;
+      return true;
     });
     return dedupeEmails(list);
   }
@@ -322,6 +335,7 @@
     if (!trimmedUser || !password || !confirm || !trimmedEmail) {
       return "Preencha todos os campos.";
     }
+    if (isRemovedUsername(trimmedUser)) return "Esse nome de usuário não está disponível.";
     if (password !== confirm) return "As senhas não coincidem.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return "Informe um email válido.";
@@ -822,7 +836,7 @@
     var money;
     var oldPlace;
     if (!list) return;
-    accounts = readAccounts();
+    accounts = cleanAccounts(readAccounts());
     ranked = accounts.slice().sort(function (a, b) {
       return accountMoney(b) - accountMoney(a);
     });
