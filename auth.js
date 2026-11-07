@@ -708,16 +708,31 @@
     return claimed !== allowanceWindowStart(now);
   }
 
+  function allowanceLedgerLabel(now) {
+    var start = new Date(allowanceWindowStart(now));
+    var weekdays = [
+      "domingo",
+      "segunda-feira",
+      "terça-feira",
+      "quarta-feira",
+      "quinta-feira",
+      "sexta-feira",
+      "sábado",
+    ];
+    return "mesada do dia (" + weekdays[start.getDay()] + ", " + formatLocalDate(start.getTime()) + ")";
+  }
+
   function claimAllowance() {
     var now = Date.now();
     var windowStart = allowanceWindowStart(now);
+    var amount = allowanceAmount(now);
     var claimed = false;
     updateAccount(function (account) {
       settleMaturedSavings(account, now);
       if (account.allowanceClaimedWindow === windowStart) return;
-      account.money = accountMoney(account) + allowanceAmount(now);
+      account.money = accountMoney(account) + amount;
       account.allowanceClaimedWindow = windowStart;
-      pushLedger(account, allowanceAmount(now), "mesada do dia");
+      pushLedger(account, amount, allowanceLedgerLabel(now));
       claimed = true;
     });
     return claimed;
