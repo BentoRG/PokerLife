@@ -660,6 +660,50 @@ main {
   opacity: 0.48;
 }
 
+.seat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.seat-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border: 2px solid #000;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: inset 0 0 0 0.18rem #d2b35c;
+  color: #000;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.role-chip-dealer {
+  background: #f4efe0;
+}
+
+.role-chip-small {
+  background: #eee;
+}
+
+.role-chip-big {
+  background: #e8e0c8;
+}
+
 .seat-name,
 .seat-meta,
 .seat-bet,
@@ -1120,6 +1164,17 @@ main {
 
   .seat {
     padding: 0.28rem 0.25rem 0.32rem;
+  }
+
+  .seat-heading {
+    gap: 0.18rem;
+  }
+
+  .role-chip {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.42rem;
+    box-shadow: inset 0 0 0 0.14rem #d2b35c;
   }
 
   .seat-name,

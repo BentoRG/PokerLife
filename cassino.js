@@ -589,13 +589,20 @@
     return node;
   }
 
-  function seatBadge(index) {
+  function roleChip(label, kind, aria) {
+    var chip = el("span", "role-chip role-chip-" + kind, label);
+    chip.setAttribute("aria-label", aria || label);
+    chip.title = aria || label;
+    return chip;
+  }
+
+  function seatRoleChips(index) {
     var blinds = Poker.blindSeats(state);
-    var parts = [];
-    if (index === state.button) parts.push("Dealer");
-    if (index === blinds.sb) parts.push("Small blind");
-    if (index === blinds.bb) parts.push("Big blind");
-    return parts.join(" · ");
+    var wrap = el("span", "seat-chips");
+    if (index === state.button) wrap.appendChild(roleChip("Dealer", "dealer", "Dealer"));
+    if (index === blinds.sb) wrap.appendChild(roleChip("Small", "small", "Small blind"));
+    if (index === blinds.bb) wrap.appendChild(roleChip("Big", "big", "Big blind"));
+    return wrap.childNodes.length ? wrap : null;
   }
 
   function handWinners() {
@@ -621,6 +628,8 @@
   function renderSeat(player, index, opts, winners) {
     var className = "seat s" + index;
     var seat;
+    var heading;
+    var chips;
     var meta = [];
     var cards;
     var hidden;
@@ -633,9 +642,12 @@
     if (player.folded) className += " folded";
     if (payout) className += " winner";
     seat = el("article", className);
-    seat.appendChild(el("p", "seat-name", player.name));
+    heading = el("div", "seat-heading");
+    chips = seatRoleChips(index);
+    heading.appendChild(el("p", "seat-name", player.name));
+    if (chips) heading.appendChild(chips);
+    seat.appendChild(heading);
     meta.push("$" + player.stack);
-    if (seatBadge(index)) meta.push(seatBadge(index));
     if (player.allIn && !player.folded) meta.push("all-in");
     if (player.folded) meta.push("fora");
     seat.appendChild(el("p", "seat-meta", meta.join(" · ")));
