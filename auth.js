@@ -8,7 +8,6 @@
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
-  var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
   var BROKE_ALLOWANCE_CUT = 25;
   var SAVINGS_DAILY_RATE = 0.015;
@@ -628,6 +627,11 @@
     return Math.max(0, Math.round(value));
   }
 
+  // Weekday mesada after broke cuts; Sunday is always double this amount.
+  function weekdayAllowance(account) {
+    return Math.max(0, ALLOWANCE - allowancePenaltyOf(account));
+  }
+
   function applyBrokePenalty(account) {
     account.allowancePenalty = allowancePenaltyOf(account) + BROKE_ALLOWANCE_CUT;
     account.brokeAllowanceNotice = BROKE_ALLOWANCE_CUT;
@@ -692,9 +696,9 @@
 
   function allowanceAmount(now) {
     var account = findAccount(currentUser() || "");
+    var daily = weekdayAllowance(account);
     var start = new Date(allowanceWindowStart(now));
-    var base = start.getDay() === 0 ? SUNDAY_ALLOWANCE : ALLOWANCE;
-    return Math.max(0, base - allowancePenaltyOf(account));
+    return start.getDay() === 0 ? daily * 2 : daily;
   }
 
   function allowanceReady(now) {
@@ -756,7 +760,12 @@
       return;
     }
     node.hidden = false;
-    node.textContent = "Sua mesada foi reduzida em $" + Math.round(cut) + ".";
+    node.textContent =
+      "Sua mesada foi reduzida em $" +
+      Math.round(cut) +
+      " ($" +
+      Math.round(cut * 2) +
+      " nos Domingos).";
     updateAccount(function (entry) {
       delete entry.brokeAllowanceNotice;
     });
@@ -1124,12 +1133,10 @@
     if (email) email.textContent = account && account.email ? account.email : "";
     if (money) money.textContent = "$" + currentMoney();
     if (mesada) {
-      mesada.textContent =
-        "$" +
-        Math.max(0, ALLOWANCE - allowancePenaltyOf(account)) +
-        " ($" +
-        Math.max(0, SUNDAY_ALLOWANCE - allowancePenaltyOf(account)) +
-        " nos Domingos)";
+      (function () {
+        var daily = weekdayAllowance(account);
+        mesada.textContent = "$" + daily + " ($" + daily * 2 + " nos Domingos)";
+      })();
     }
     paintItems(account);
     paintLedger(account);
