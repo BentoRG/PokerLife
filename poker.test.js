@@ -280,4 +280,88 @@ check("any raise above the current bet reopens action", function () {
   assert.ok(legal.maxRaiseTo > legal.minRaiseTo);
 });
 
+check("five card draw deals five, draws, then showdown", function () {
+  var state = Poker.createHand({
+    variant: "five-card-draw",
+    players: [
+      { id: "a", name: "Ana", stack: 500 },
+      { id: "b", name: "Bia", stack: 500 },
+    ],
+    button: 0,
+    sb: 5,
+    bb: 10,
+    deck: [
+      "As", "Kd",
+      "Ah", "Qc",
+      "Ad", "Jd",
+      "2c", "3c",
+      "4c", "5c",
+      "Kh", "Qh", "Jh", "Th", "9h",
+      "8s", "7s", "6s", "5s", "4s",
+    ],
+  });
+  var legal;
+  assert.strictEqual(state.variant, "five-card-draw");
+  assert.strictEqual(state.players[0].hole.length, 5);
+  assert.strictEqual(state.players[1].hole.length, 5);
+  assert.deepStrictEqual(state.players[0].hole, ["As", "Ah", "Ad", "2c", "4c"]);
+  assert.deepStrictEqual(state.players[1].hole, ["Kd", "Qc", "Jd", "3c", "5c"]);
+  act(state, "call");
+  act(state, "check");
+  assert.strictEqual(Poker.advance(state).event, "draw");
+  assert.strictEqual(state.street, "draw");
+  legal = Poker.legalActions(state);
+  assert.strictEqual(legal.discard, true);
+  assert.ok(legal.maxDiscard >= 2);
+  assert.strictEqual(state.players[state.toAct].id, "b");
+  act(state, "discard", [1, 2, 3, 4]);
+  assert.strictEqual(state.players[1].hole.length, 5);
+  assert.strictEqual(state.players[1].hole[0], "Kd");
+  act(state, "discard", [3, 4]);
+  assert.strictEqual(state.toAct, -1);
+  assert.strictEqual(Poker.advance(state).event, "draw-bet");
+  assert.strictEqual(state.street, "draw-bet");
+  act(state, "check");
+  act(state, "check");
+  assert.strictEqual(Poker.advance(state).event, "showdown");
+  assert.strictEqual(state.revealed, true);
+  assert.strictEqual(state.payouts[0].playerId, "a");
+  assert.strictEqual(state.payouts[0].hand, "trips");
+  assert.strictEqual(chips(state), 1000);
+});
+
+check("five card draw stand pat keeps the same five cards", function () {
+  var state = Poker.createHand({
+    variant: "five-card-draw",
+    players: [
+      { id: "a", name: "Ana", stack: 200 },
+      { id: "b", name: "Bia", stack: 200 },
+    ],
+    button: 0,
+    sb: 5,
+    bb: 10,
+    deck: [
+      "As", "Ks",
+      "Ah", "Kh",
+      "Ad", "Kd",
+      "Ac", "Kc",
+      "2s", "2h",
+      "9c", "8c", "7c", "6c", "5c",
+    ],
+  });
+  var kept;
+  act(state, "call");
+  act(state, "check");
+  Poker.advance(state);
+  kept = state.players[1].hole.slice();
+  act(state, "discard", []);
+  assert.deepStrictEqual(state.players[1].hole, kept);
+  act(state, "discard", []);
+  Poker.advance(state);
+  act(state, "check");
+  act(state, "check");
+  Poker.advance(state);
+  assert.strictEqual(state.payouts[0].hand, "quads");
+});
+
 console.log(passed + " passed");

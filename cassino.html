@@ -26,8 +26,12 @@
       <div class="cassino-layout">
         <div class="cassino-play">
           <div id="mode-select" class="mode-select">
-            <button type="button" id="play-bots">Jogar Texas Hold'em com bots</button>
-            <button type="button" id="play-friends">Jogar Texas Hold'em com amigos</button>
+            <p class="mode-group-label">Texas Hold'em</p>
+            <button type="button" id="play-bots">Jogar com bots</button>
+            <button type="button" id="play-friends">Jogar com amigos</button>
+            <p class="mode-group-label">Five Card Draw</p>
+            <button type="button" id="play-draw-bots">Jogar com bots</button>
+            <button type="button" id="play-draw-friends">Jogar com amigos</button>
             <p id="mode-notice" class="mode-notice" hidden role="status"></p>
           </div>
           <div id="friends-lobby" class="friends-lobby" hidden>
@@ -44,6 +48,7 @@
             </div>
             <div id="friends-waiting" class="friends-waiting" hidden>
               <p class="friends-code-line">Código: <strong id="room-code-display"></strong></p>
+              <p class="friends-variant" id="friends-variant-label"></p>
               <p class="friends-blinds">Blinds fixos: $10 / $20</p>
               <ul id="room-players" class="room-players"></ul>
               <button type="button" id="start-friends-game" hidden>Iniciar jogo</button>

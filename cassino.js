@@ -35,7 +35,13 @@
     flop: "Flop",
     turn: "Turn",
     river: "River",
+    draw: "Troca",
+    "draw-bet": "Pós-troca",
     complete: "Mão encerrada",
+  };
+  var VARIANT_LABELS = {
+    holdem: "Texas Hold'em",
+    "five-card-draw": "Five Card Draw",
   };
   var RANK = "23456789TJQKA";
   // Persist the live match so a refresh cannot discard a bad hand for a new deal.
@@ -52,6 +58,9 @@
   var handClosing = false;
   var vsBots = false;
   var vsFriends = false;
+  var gameVariant = "holdem";
+  var pendingVariant = "holdem";
+  var selectedDiscards = {};
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
@@ -93,6 +102,7 @@
         MATCH_KEY,
         JSON.stringify({
           vsBots: vsBots,
+          gameVariant: gameVariant,
           button: button,
           roster: roster,
           state: state,
@@ -193,6 +203,11 @@
     var cards;
     var draw;
     var bases = [0.12, 0.42, 0.6, 0.72, 0.8, 0.84, 0.9, 0.96, 0.99];
+    if (table.variant === "five-card-draw") {
+      made = Poker.rankCards(player.hole);
+      if (!made) return 0;
+      return clamp(bases[made[0]] + made[1] / 100, 0, 1);
+    }
     if (!table.board.length) return clamp(chen(player.hole[0], player.hole[1]) / 20, 0, 1);
     made = Poker.rankCards(player.hole.concat(table.board));
     base = bases[made[0]];
@@ -205,6 +220,76 @@
       else if (draw.gutshot) score += 0.05;
     }
     return clamp(score, 0, 1);
+  }
+
+  function chooseDiscardIndices(hole) {
+    var counts = {};
+    var suits = {};
+    var keep = {};
+    var discard = [];
+    var i;
+    var card;
+    var rank;
+    var suit;
+    var bestSuit = null;
+    var bestSuitCount = 0;
+    var groups;
+    var made;
+    var pairRanks = {};
+    var order;
+    if (!hole || hole.length < 5) return [];
+    made = Poker.rankCards(hole);
+    for (i = 0; i < hole.length; i += 1) {
+      card = hole[i];
+      rank = rankValue(card);
+      suit = card.charAt(1);
+      counts[rank] = (counts[rank] || 0) + 1;
+      suits[suit] = (suits[suit] || 0) + 1;
+      if (suits[suit] > bestSuitCount) {
+        bestSuitCount = suits[suit];
+        bestSuit = suit;
+      }
+    }
+    groups = Object.keys(counts)
+      .map(function (key) {
+        return { rank: Number(key), count: counts[key] };
+      })
+      .sort(function (a, b) {
+        if (b.count !== a.count) return b.count - a.count;
+        return b.rank - a.rank;
+      });
+    if (made && made[0] >= 4) return [];
+    if (groups[0] && groups[0].count >= 2) {
+      for (i = 0; i < groups.length; i += 1) {
+        if (groups[i].count >= 2) pairRanks[groups[i].rank] = true;
+      }
+      for (i = 0; i < hole.length; i += 1) {
+        if (pairRanks[rankValue(hole[i])]) keep[i] = true;
+      }
+      if (groups[0].count === 3 && groups[1] && groups[1].count === 1) {
+        // Keep trips; discard both kickers unless one is an ace for full-house hopes.
+        for (i = 0; i < hole.length; i += 1) {
+          if (!keep[i] && rankValue(hole[i]) === 14) keep[i] = true;
+        }
+      }
+    } else if (bestSuitCount >= 4) {
+      for (i = 0; i < hole.length; i += 1) {
+        if (hole[i].charAt(1) === bestSuit) keep[i] = true;
+      }
+    } else {
+      // Keep the two highest cards when nothing is made.
+      order = hole.map(function (item, index) {
+        return { index: index, rank: rankValue(item) };
+      }).sort(function (a, b) {
+        return b.rank - a.rank;
+      });
+      keep[order[0].index] = true;
+      keep[order[1].index] = true;
+    }
+    for (i = 0; i < hole.length; i += 1) {
+      if (!keep[i]) discard.push(i);
+    }
+    return discard;
   }
 
   function sizedBet(table, legal, fraction) {
@@ -311,6 +396,7 @@
   // Bot 1: always continues preflop; postflop only with a made hand or strong draw.
   function chooseCallingStation(table, legal, player) {
     var score = strength(player, table);
+    if (table.variant === "five-card-draw") return chooseSkillful(table, legal, player);
     if (!table.board.length) {
       if (legal.call > 0) {
         if (legal.minRaiseTo != null && score >= 0.62 && Math.random() < 0.92) {
@@ -367,6 +453,18 @@
     var made;
     var allInWorthy;
     if (!maniacWildHand) return chooseSkillful(table, legal, player);
+    if (table.variant === "five-card-draw") {
+      if (table.street !== "draw-bet") return chooseSkillful(table, legal, player);
+      score = strength(player, table);
+      made = Poker.rankCards(player.hole);
+      allInWorthy = score >= 0.88 || (made && made[0] >= 5);
+      if (legal.minRaiseTo != null && !maniacFired && (allInWorthy || score >= 0.72) && Math.random() < 0.75) {
+        maniacFired = true;
+        if (allInWorthy && Math.random() < 0.7) return { type: "raise", to: legal.maxRaiseTo };
+        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.45 ? 1.2 : 1.65) };
+      }
+      return chooseSkillful(table, legal, player);
+    }
     if (!table.board.length) return chooseSkillful(table, legal, player);
     score = strength(player, table);
     made = Poker.rankCards(player.hole.concat(table.board));
@@ -525,8 +623,17 @@
   function chooseBot(table) {
     var legal = Poker.legalActions(table);
     var player = table.players[table.toAct];
-    var choice = chooseByStyle(styleOf(player), table, legal, player);
-    choice = withBigBetFear(choice, table, legal, player);
+    var choice;
+    if (legal && legal.discard) {
+      return {
+        type: "discard",
+        to: chooseDiscardIndices(player.hole).slice(0, legal.maxDiscard || 0),
+      };
+    }
+    choice = chooseByStyle(styleOf(player), table, legal, player);
+    if (table.variant !== "five-card-draw") {
+      choice = withBigBetFear(choice, table, legal, player);
+    }
     return withMoneyFear(choice, table, legal, player);
   }
 
@@ -691,6 +798,13 @@
       if (entry.opening) return label + " aposta $" + entry.to + suffix;
       return label + " aumenta para $" + entry.to + suffix;
     }
+    if (entry.kind === "discard") {
+      if (!entry.count) return label + " fica";
+      return label + " troca " + entry.count + (entry.count === 1 ? " carta" : " cartas");
+    }
+    if (entry.kind === "street") {
+      return STREETS[entry.street] || entry.street;
+    }
     if (entry.kind === "board") {
       cards = entry.cards.map(cardLabel);
       return { flop: "Flop", turn: "Turn", river: "River" }[entry.street] + ": " + cards.join(" ");
@@ -828,7 +942,33 @@
     if (!opts.hideHoles) {
       hidden = !isLocalPlayer(player) && (player.folded || opts.coverShowdown || !state.revealed);
       for (i = 0; i < player.hole.length; i += 1) {
-        cards.appendChild(cardNode(player.hole[i], hidden, !hidden && cardWasUsed(winners, player.hole[i])));
+        (function (cardIndex) {
+          var node = cardNode(
+            player.hole[cardIndex],
+            hidden,
+            !hidden && cardWasUsed(winners, player.hole[cardIndex])
+          );
+          if (!hidden && isLocalPlayer(player) && isDiscardTurn()) {
+            node.className += " selectable";
+            if (selectedDiscards[cardIndex]) node.className += " selected";
+            node.setAttribute("role", "button");
+            node.setAttribute("tabindex", "0");
+            node.setAttribute(
+              "aria-pressed",
+              selectedDiscards[cardIndex] ? "true" : "false"
+            );
+            node.addEventListener("click", function () {
+              toggleDiscard(cardIndex);
+            });
+            node.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleDiscard(cardIndex);
+              }
+            });
+          }
+          cards.appendChild(node);
+        })(i);
       }
     }
     seat.appendChild(cards);
@@ -858,11 +998,22 @@
     notice.textContent = "";
   }
 
-  function showFriendsSetup() {
+  function variantLabel(variant) {
+    return VARIANT_LABELS[variant] || VARIANT_LABELS.holdem;
+  }
+
+  function setFriendsVariantLabel(variant) {
+    var node = document.getElementById("friends-variant-label");
+    if (node) node.textContent = variantLabel(variant || gameVariant || pendingVariant);
+  }
+
+  function showFriendsSetup(variant) {
     var lobby = document.getElementById("friends-lobby");
     var setup = document.getElementById("friends-setup");
     var waiting = document.getElementById("friends-waiting");
     var codeInput = document.getElementById("room-code");
+    pendingVariant = variant === "five-card-draw" ? "five-card-draw" : "holdem";
+    gameVariant = pendingVariant;
     hideNotice();
     showFriendsNotice("");
     document.getElementById("mode-select").hidden = true;
@@ -872,6 +1023,7 @@
     if (lobby) lobby.hidden = false;
     if (setup) setup.hidden = false;
     if (waiting) waiting.hidden = true;
+    setFriendsVariantLabel(pendingVariant);
     if (codeInput && !codeInput.value) codeInput.value = randomRoomCode();
   }
 
@@ -914,6 +1066,7 @@
     if (lobby) lobby.hidden = false;
     if (setup) setup.hidden = true;
     if (waiting) waiting.hidden = false;
+    setFriendsVariantLabel(gameVariant || pendingVariant);
     paintRoomPlayers();
   }
 
@@ -946,10 +1099,12 @@
         showFriendsNotice("Esse código já está em uso. Escolha outro.");
         return null;
       }
+      gameVariant = pendingVariant === "five-card-draw" ? "five-card-draw" : "holdem";
       next = {
         code: code,
         hostId: name,
         phase: "lobby",
+        variant: gameVariant,
         players: [{ id: name, name: name, stack: money, left: false }],
         button: 0,
         matchSb: FRIENDS_SB,
@@ -1013,6 +1168,8 @@
         isHost = saved.hostId === name;
         vsFriends = true;
         vsBots = false;
+        gameVariant = saved.variant === "five-card-draw" ? "five-card-draw" : "holdem";
+        pendingVariant = gameVariant;
         showFriendsNotice("");
         showFriendsWaiting();
         beginRoomPoll(pollFriendsLobby);
@@ -1061,11 +1218,13 @@
       }
       room = remote;
       lastRoomSeq = remote.seq || lastRoomSeq;
+      gameVariant = remote.variant === "five-card-draw" ? "five-card-draw" : "holdem";
       if (remote.phase === "playing") {
         stopRoomPoll();
         enterFriendsMatch(remote);
         return;
       }
+      setFriendsVariantLabel(gameVariant);
       paintRoomPlayers();
     }).catch(function () {});
   }
@@ -1092,8 +1251,10 @@
     matchSb = FRIENDS_SB;
     matchBb = FRIENDS_BB;
     startStack = players[0].stack;
+    gameVariant = room.variant === "five-card-draw" ? "five-card-draw" : gameVariant || "holdem";
     next = Object.assign({}, room, {
       phase: "playing",
+      variant: gameVariant,
       players: players,
       button: button,
       matchSb: matchSb,
@@ -1125,6 +1286,7 @@
     room = remote;
     roomCode = remote.code || roomCode;
     isHost = remote.hostId === localPlayerId;
+    gameVariant = remote.variant === "five-card-draw" ? "five-card-draw" : "holdem";
     matchSb = remote.matchSb || FRIENDS_SB;
     matchBb = remote.matchBb || FRIENDS_BB;
     button = typeof remote.button === "number" ? remote.button : 0;
@@ -1165,6 +1327,7 @@
       code: roomCode,
       hostId: room && room.hostId ? room.hostId : localPlayerId,
       phase: "playing",
+      variant: gameVariant,
       players: players,
       button: button,
       matchSb: matchSb,
@@ -1202,6 +1365,7 @@
       });
     }
     if (typeof remote.button === "number") button = remote.button;
+    gameVariant = remote.variant === "five-card-draw" ? "five-card-draw" : gameVariant || "holdem";
     matchSb = remote.matchSb || FRIENDS_SB;
     matchBb = remote.matchBb || FRIENDS_BB;
     sameHand = !!(state && remote.state && state.log && remote.state.log && state.log.length === remote.state.log.length && state.street === remote.state.street);
@@ -1447,6 +1611,9 @@
     stopRoomPoll();
     clearMatchSave();
     vsBots = false;
+    gameVariant = "holdem";
+    pendingVariant = "holdem";
+    selectedDiscards = {};
     resetFriendsFlags();
     roster = null;
     state = null;
@@ -1518,12 +1685,15 @@
     button = roster.length - 1;
   }
 
-  function startMatch() {
+  function startMatch(variant) {
     clearTimeout(timer);
     dealToken += 1;
     stopRoomPoll();
     resetFriendsFlags();
     vsBots = true;
+    gameVariant = variant === "five-card-draw" ? "five-card-draw" : "holdem";
+    pendingVariant = gameVariant;
+    selectedDiscards = {};
     freshRoster();
     hideNotice();
     document.getElementById("mode-select").hidden = true;
@@ -1538,6 +1708,11 @@
     clearTimeout(timer);
     dealToken += 1;
     vsBots = true;
+    gameVariant = saved.gameVariant === "five-card-draw" || (saved.state && saved.state.variant === "five-card-draw")
+      ? "five-card-draw"
+      : "holdem";
+    pendingVariant = gameVariant;
+    selectedDiscards = {};
     button = saved.button;
     roster = saved.roster;
     state = saved.state || null;
@@ -1625,12 +1800,13 @@
 
   function dealQueue(table) {
     var start = (table.button + 1) % table.players.length;
+    var rounds = table.variant === "five-card-draw" ? 5 : 2;
     var queue = [];
     var round;
     var step;
     var index;
     if (table.players.length === 2) start = table.button;
-    for (round = 0; round < 2; round += 1) {
+    for (round = 0; round < rounds; round += 1) {
       for (step = 0; step < table.players.length; step += 1) {
         index = (start + step) % table.players.length;
         if (table.players[index].hole.length <= round) continue;
@@ -1638,6 +1814,48 @@
       }
     }
     return queue;
+  }
+
+  function isDiscardTurn() {
+    return !!(
+      state &&
+      !handClosing &&
+      state.street === "draw" &&
+      state.toAct >= 0 &&
+      isLocalPlayer(state.players[state.toAct])
+    );
+  }
+
+  function selectedDiscardList() {
+    return Object.keys(selectedDiscards)
+      .map(Number)
+      .filter(function (index) {
+        return !isNaN(index);
+      })
+      .sort(function (a, b) {
+        return a - b;
+      });
+  }
+
+  function toggleDiscard(index) {
+    var legal;
+    var picks;
+    if (!isDiscardTurn()) return;
+    if (selectedDiscards[index]) {
+      delete selectedDiscards[index];
+      render();
+      return;
+    }
+    legal = Poker.legalActions(state);
+    picks = selectedDiscardList();
+    if (legal && picks.length >= (legal.maxDiscard || 0)) return;
+    selectedDiscards[index] = true;
+    render();
+  }
+
+  function confirmDiscard(indices) {
+    selectedDiscards = {};
+    humanAct("discard", indices || []);
   }
 
   function flipCard(node, card, done) {
@@ -1777,6 +1995,9 @@
       }).join(" · ");
     }
     if (state.toAct >= 0 && isLocalPlayer(state.players[state.toAct])) {
+      if (state.street === "draw") {
+        return "Escolha as cartas para trocar · pote $" + Poker.potSize(state);
+      }
       return "Sua vez · pote $" + Poker.potSize(state);
     }
     if (state.toAct >= 0) return state.players[state.toAct].name + " está pensando · pote $" + Poker.potSize(state);
@@ -1796,6 +2017,7 @@
     var raiseBox = document.getElementById("raise-box");
     clear(document.getElementById("actions"));
     if (raiseBox) raiseBox.remove();
+    if (type === "discard") selectedDiscards = {};
     if (vsFriends && !isHost) {
       submitFriendsAction(type, to);
       return;
@@ -1891,6 +2113,28 @@
     if (state.handOver || state.toAct < 0 || !isLocalPlayer(state.players[state.toAct])) return;
     legal = Poker.legalActions(state);
     player = state.players[state.toAct];
+    if (legal && legal.discard) {
+      (function () {
+        var picks = selectedDiscardList();
+        var note = el(
+          "p",
+          "discard-hint",
+          picks.length
+            ? "Selecionadas: " + picks.length
+            : "Toque nas cartas que deseja trocar"
+        );
+        box.appendChild(note);
+        box.appendChild(actionButton("Ficar", function () {
+          confirmDiscard([]);
+        }));
+        if (picks.length) {
+          box.appendChild(actionButton("Trocar " + picks.length, function () {
+            confirmDiscard(picks);
+          }));
+        }
+      })();
+      return;
+    }
     if (legal.fold) box.appendChild(actionButton("Desistir", function () { humanAct("fold"); }));
     if (legal.check) box.appendChild(actionButton("Passar", function () { humanAct("check"); }));
     if (legal.call > 0) {
@@ -2172,6 +2416,7 @@
     shownBoard = 0;
     shownHoles = false;
     handClosing = false;
+    selectedDiscards = {};
     pickRaviStyle();
     pickManiacMood();
     if (actions) clear(actions);
@@ -2198,6 +2443,7 @@
       button: button,
       sb: matchSb,
       bb: matchBb,
+      variant: gameVariant,
     });
     logCursor = 0;
     marker("Nova mão · dealer com " + roster[button].name);
@@ -2226,8 +2472,18 @@
     var startBtn = document.getElementById("start-friends-game");
     var leaveRoomBtn = document.getElementById("leave-room");
     var leaveMatchBtn = document.getElementById("leave-match");
-    document.getElementById("play-bots").addEventListener("click", startMatch);
-    document.getElementById("play-friends").addEventListener("click", showFriendsSetup);
+    document.getElementById("play-bots").addEventListener("click", function () {
+      startMatch("holdem");
+    });
+    document.getElementById("play-friends").addEventListener("click", function () {
+      showFriendsSetup("holdem");
+    });
+    document.getElementById("play-draw-bots").addEventListener("click", function () {
+      startMatch("five-card-draw");
+    });
+    document.getElementById("play-draw-friends").addEventListener("click", function () {
+      showFriendsSetup("five-card-draw");
+    });
     if (createBtn) createBtn.addEventListener("click", createFriendsRoom);
     if (joinBtn) joinBtn.addEventListener("click", joinFriendsRoom);
     if (backBtn) backBtn.addEventListener("click", showModeSelect);
@@ -2253,6 +2509,7 @@
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
       chooseBot: chooseBot,
+      chooseDiscardIndices: chooseDiscardIndices,
       estimateBetMeaning: estimateBetMeaning,
       withBigBetFear: withBigBetFear,
       comboLooksStrong: comboLooksStrong,

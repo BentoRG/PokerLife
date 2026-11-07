@@ -246,13 +246,22 @@
     });
   }
 
+  function holeCount(state) {
+    return state.variant === "five-card-draw" ? 5 : 2;
+  }
+
+  function isDrawPoker(state) {
+    return state.variant === "five-card-draw";
+  }
+
   function dealHoles(state) {
     var start = (state.button + 1) % state.players.length;
+    var rounds = holeCount(state);
     var round;
     var step;
     var index;
     if (state.players.length === 2) start = state.button;
-    for (round = 0; round < 2; round += 1) {
+    for (round = 0; round < rounds; round += 1) {
       for (step = 0; step < state.players.length; step += 1) {
         index = (start + step) % state.players.length;
         if (state.players[index].folded) continue;
@@ -277,8 +286,11 @@
   function createHand(opts) {
     var seated = 0;
     var state;
+    var variant;
     opts = opts || {};
+    variant = opts.variant === "five-card-draw" ? "five-card-draw" : "holdem";
     state = {
+      variant: variant,
       sb: opts.sb,
       bb: opts.bb,
       button: opts.button || 0,
@@ -294,6 +306,7 @@
           folded: player.stack <= 0,
           allIn: false,
           acted: false,
+          discarded: false,
         };
       }),
       deck: (opts.deck || freshDeck(opts.rng)).slice(),
@@ -316,6 +329,56 @@
     return state;
   }
 
+  function mustDiscard(player) {
+    return !player.folded && !player.discarded;
+  }
+
+  function nextDrawer(state, from) {
+    var count = state.players.length;
+    var step;
+    var index;
+    for (step = 1; step <= count; step += 1) {
+      index = (from + step) % count;
+      if (mustDiscard(state.players[index])) return index;
+    }
+    return -1;
+  }
+
+  function openDrawRound(state) {
+    state.street = "draw";
+    state.players.forEach(function (player) {
+      player.streetBet = 0;
+      player.acted = false;
+      player.discarded = false;
+    });
+    state.currentBet = 0;
+    state.lastFullRaiseSize = 1;
+    state.toAct = nextDrawer(state, state.button);
+    state.log.push({ kind: "street", street: "draw" });
+  }
+
+  function openDrawBet(state) {
+    state.street = "draw-bet";
+    state.players.forEach(function (player) {
+      player.streetBet = 0;
+      player.acted = false;
+    });
+    state.currentBet = 0;
+    state.lastFullRaiseSize = 1;
+    state.log.push({ kind: "street", street: "draw-bet" });
+    state.toAct = nextActor(state, state.button);
+  }
+
+  function discardBudget(state) {
+    var waiting = 0;
+    var i;
+    for (i = 0; i < state.players.length; i += 1) {
+      if (mustDiscard(state.players[i])) waiting += 1;
+    }
+    if (waiting <= 0) return 0;
+    return Math.min(5, Math.floor(state.deck.length / waiting));
+  }
+
   function legalActions(state) {
     var player;
     var toCall;
@@ -323,6 +386,17 @@
     var maxTo;
     if (!state || state.handOver || state.toAct < 0) return null;
     player = state.players[state.toAct];
+    if (state.street === "draw") {
+      return {
+        discard: true,
+        maxDiscard: Math.min(player.hole.length, discardBudget(state)),
+        fold: false,
+        check: false,
+        call: 0,
+        minRaiseTo: null,
+        maxRaiseTo: null,
+      };
+    }
     toCall = state.currentBet - player.streetBet;
     actions = {
       fold: toCall > 0,
@@ -361,6 +435,52 @@
     return paid;
   }
 
+  function uniqueSortedIndices(indices, max) {
+    var seen = {};
+    var out = [];
+    var i;
+    var index;
+    if (!Array.isArray(indices)) return null;
+    for (i = 0; i < indices.length; i += 1) {
+      index = indices[i];
+      if (typeof index !== "number" || Math.floor(index) !== index) return null;
+      if (index < 0 || index >= max) return null;
+      if (seen[index]) return null;
+      seen[index] = true;
+      out.push(index);
+    }
+    out.sort(function (a, b) {
+      return b - a;
+    });
+    return out;
+  }
+
+  function applyDiscard(state, player, indices) {
+    var legal = legalActions(state);
+    var maxDiscard = legal && legal.maxDiscard != null ? legal.maxDiscard : 0;
+    var sorted = uniqueSortedIndices(indices || [], player.hole.length);
+    var removed = [];
+    var i;
+    if (!sorted) return fail("Discard indices are invalid.");
+    if (sorted.length > maxDiscard) return fail("Too many discards.");
+    if (sorted.length > state.deck.length) return fail("Deck is empty.");
+    for (i = 0; i < sorted.length; i += 1) {
+      removed.push(player.hole.splice(sorted[i], 1)[0]);
+    }
+    for (i = 0; i < removed.length; i += 1) {
+      player.hole.push(state.deck.shift());
+    }
+    player.discarded = true;
+    player.acted = true;
+    state.log.push({
+      kind: "discard",
+      playerId: player.id,
+      count: removed.length,
+    });
+    state.toAct = nextDrawer(state, state.toAct);
+    return { ok: true };
+  }
+
   function act(state, type, to) {
     var player;
     var legal;
@@ -372,6 +492,10 @@
     legal = legalActions(state);
     paid = 0;
     opening = state.currentBet === 0;
+    if (type === "discard") {
+      if (!legal || !legal.discard) return fail("Discard is not legal.");
+      return applyDiscard(state, player, to);
+    }
     if (type === "fold") {
       if (!legal.fold) return fail("Fold is not legal.");
       player.folded = true;
@@ -485,7 +609,8 @@
       var share;
       var extra;
       pot.contenders.forEach(function (player) {
-        var rank = player.handRank || (state.board.length >= 5 ? rankCards(player.hole.concat(state.board)) : null);
+        var available = player.hole.concat(state.board);
+        var rank = player.handRank || (available.length >= 5 ? rankCards(available) : null);
         var cmp = best == null || !rank ? 1 : compareRanks(rank, best);
         if (!state.revealed) {
           winners = pot.contenders.slice();
@@ -546,6 +671,18 @@
     if (live.length === 1) {
       award(state);
       return { ok: true, event: "fold-win" };
+    }
+    if (isDrawPoker(state)) {
+      if (state.street === "preflop") {
+        openDrawRound(state);
+        return { ok: true, event: "draw" };
+      }
+      if (state.street === "draw") {
+        openDrawBet(state);
+        return { ok: true, event: "draw-bet" };
+      }
+      award(state);
+      return { ok: true, event: "showdown" };
     }
     if (state.board.length < 5) {
       dealStreet(state);

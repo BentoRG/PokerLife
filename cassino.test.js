@@ -155,4 +155,44 @@ check("withBigBetFear keeps strong hands against big bets", function () {
   assert.strictEqual(folds, 0);
 });
 
+check("chooseDiscardIndices keeps pairs and trips", function () {
+  var pair = Cassino.chooseDiscardIndices(["As", "Ah", "9c", "4d", "2s"]);
+  var trips = Cassino.chooseDiscardIndices(["Kc", "Kd", "Kh", "9s", "3c"]);
+  var flushDraw = Cassino.chooseDiscardIndices(["As", "Ks", "9s", "4s", "2h"]);
+  assert.deepStrictEqual(pair.slice().sort(), [2, 3, 4]);
+  assert.deepStrictEqual(trips.slice().sort(), [3, 4]);
+  assert.deepStrictEqual(flushDraw, [4]);
+});
+
+check("draw bots discard instead of betting on the draw street", function () {
+  var state = Poker.createHand({
+    variant: "five-card-draw",
+    players: [
+      { id: "hero", name: "Hero", stack: 500, isHuman: true },
+      { id: "lia", name: "Bot 1", stack: 500, isHuman: false },
+    ],
+    button: 0,
+    sb: 5,
+    bb: 10,
+    deck: [
+      "As", "Kd",
+      "Ah", "Qc",
+      "2c", "Jd",
+      "3c", "9c",
+      "4c", "8c",
+      "Kh", "Qh", "Jh", "Th", "9h",
+      "7s", "6s", "5s", "4s", "3s",
+    ],
+  });
+  var choice;
+  Poker.act(state, "call");
+  Poker.act(state, "check");
+  Poker.advance(state);
+  assert.strictEqual(state.street, "draw");
+  assert.strictEqual(state.players[state.toAct].id, "lia");
+  choice = Cassino.chooseBot(state);
+  assert.strictEqual(choice.type, "discard");
+  assert.ok(Array.isArray(choice.to));
+});
+
 console.log(passed + " passed");
