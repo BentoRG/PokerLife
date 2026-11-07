@@ -45,6 +45,8 @@
   var NOTICE_MS = 3200;
   // Bot 4 picks one of the other three personalities at random each hand.
   var raviStyle = null;
+  // Stack bots started the match with; used so richer bots fold less and poorer ones fold more.
+  var startStack = START;
 
   function clearMatchSave() {
     try {
@@ -67,6 +69,7 @@
           handClosing: handClosing,
           statusMessage: statusMessage,
           raviStyle: raviStyle,
+          startStack: startStack,
         })
       );
     } catch (error) {}
@@ -322,10 +325,33 @@
     return chooseCallingStation(table, legal, player);
   }
 
+  // 0.5 at the match starting stack; lower when rich (brave), higher when poor (scared).
+  function moneyFear(player) {
+    var baseline = startStack > 0 ? startStack : START;
+    var ratio = player.stack / baseline;
+    return clamp(0.5 - (Math.log(Math.max(ratio, 0.08)) / Math.LN2) * 0.28, 0.05, 0.95);
+  }
+
+  // Rich bots sometimes call instead of folding; poor bots sometimes fold instead of continuing.
+  function withMoneyFear(choice, table, legal, player) {
+    var fear = moneyFear(player);
+    var loosen = 0.5 - fear;
+    if (!choice) return choice;
+    if (choice.type === "fold" && legal.call > 0 && loosen > 0 && Math.random() < loosen * 1.35) {
+      return { type: "call" };
+    }
+    if (legal.fold && legal.call > 0 && loosen < 0) {
+      if ((choice.type === "call" || choice.type === "raise") && Math.random() < -loosen * 1.25) {
+        return { type: "fold" };
+      }
+    }
+    return choice;
+  }
+
   function chooseBot(table) {
     var legal = Poker.legalActions(table);
     var player = table.players[table.toAct];
-    return chooseByStyle(styleOf(player), table, legal, player);
+    return withMoneyFear(chooseByStyle(styleOf(player), table, legal, player), table, legal, player);
   }
 
   function later(fn, ms) {
@@ -585,6 +611,7 @@
 
   function freshRoster() {
     var stack = botStack();
+    startStack = stack;
     roster = [
       { id: "hero", name: "Você", stack: heroMoney(), isHuman: true },
       { id: "lia", name: "Bot 1", stack: stack, isHuman: false },
@@ -618,6 +645,7 @@
     handClosing = !!saved.handClosing;
     logCursor = 0;
     statusMessage = saved.statusMessage || "";
+    startStack = saved.startStack > 0 ? saved.startStack : botStack();
     raviStyle = STYLES.indexOf(saved.raviStyle) >= 0 ? saved.raviStyle : null;
     if (!raviStyle) pickRaviStyle();
     hideNotice();
