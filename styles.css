@@ -191,6 +191,64 @@ main {
   margin-top: 0.2rem;
 }
 
+.ranking li.rank-up,
+.ranking li.rank-down {
+  position: relative;
+}
+
+.ranking li.rank-up {
+  color: #1f5b2e;
+  animation: rank-rise 0.85s ease-out;
+}
+
+.ranking li.rank-down {
+  color: #7a3030;
+  animation: rank-fall 0.85s ease-out;
+}
+
+.ranking li.rank-up::after,
+.ranking li.rank-down::after {
+  margin-left: 0.35rem;
+  font-size: 0.85em;
+}
+
+.ranking li.rank-up::after {
+  content: "▲";
+}
+
+.ranking li.rank-down::after {
+  content: "▼";
+}
+
+@keyframes rank-rise {
+  from {
+    opacity: 0.35;
+    transform: translateY(0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rank-fall {
+  from {
+    opacity: 0.35;
+    transform: translateY(-0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ranking li.rank-up,
+  .ranking li.rank-down {
+    animation: none;
+  }
+}
+
 .login-header {
   display: flex;
   align-items: flex-start;

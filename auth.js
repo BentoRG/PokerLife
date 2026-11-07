@@ -19,7 +19,9 @@
     rapida: 0.55,
     "muito-rapida": 0.28,
   };
+  var RANKING_SNAP_KEY = "pokerlife.ranking.order";
   var syncing = null;
+  var lastPaintedRankingSig = null;
 
   function pageName() {
     var name = location.pathname.split("/").pop();
@@ -32,6 +34,10 @@
 
   function isResetPage() {
     return pageName() === "redefinir.html";
+  }
+
+  function isHomePage() {
+    return pageName() === "index.html";
   }
 
   function isPublicPage() {
@@ -286,8 +292,11 @@
   }
 
   window.addEventListener("pageshow", function (event) {
-    if (!event.persisted || isPublicPage() || currentUser()) return;
-    location.replace("login.html?next=" + encodeURIComponent(safeNext(pageName())));
+    if (event.persisted && !isPublicPage() && !currentUser()) {
+      location.replace("login.html?next=" + encodeURIComponent(safeNext(pageName())));
+      return;
+    }
+    if (isHomePage() && currentUser()) refreshHomeRanking();
   });
 
   function signIn(username, password) {
@@ -572,15 +581,59 @@
 
   var allowanceTicking = false;
 
+  function readRankingSnapshot() {
+    try {
+      var parsed = JSON.parse(sessionStorage.getItem(RANKING_SNAP_KEY) || "null");
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeRankingSnapshot(order) {
+    try {
+      sessionStorage.setItem(RANKING_SNAP_KEY, JSON.stringify(order));
+    } catch (error) {}
+  }
+
+  function previousRankingPlaces(snapshot) {
+    var places = {};
+    var i;
+    var entry;
+    if (!snapshot) return places;
+    for (i = 0; i < snapshot.length; i += 1) {
+      entry = snapshot[i];
+      if (!entry || typeof entry.name !== "string" || !entry.name.trim()) continue;
+      if (typeof entry.place !== "number" || !isFinite(entry.place)) continue;
+      places[entry.name.trim().toLowerCase()] = entry.place;
+    }
+    return places;
+  }
+
+  function rankingSignature(order) {
+    return order
+      .map(function (entry) {
+        return entry.name + ":" + entry.money + ":" + entry.place;
+      })
+      .join("|");
+  }
+
   function paintRanking() {
     var list = document.querySelector(".ranking");
     var accounts;
     var ranked;
+    var previous = readRankingSnapshot();
+    var prevPlaces = previousRankingPlaces(previous);
+    var nextSnap = [];
+    var place = 0;
+    var signature;
     var i;
     var item;
     var account;
+    var name;
+    var money;
+    var oldPlace;
     if (!list) return;
-    list.textContent = "";
     accounts = readAccounts();
     ranked = accounts.slice().sort(function (a, b) {
       return accountMoney(b) - accountMoney(a);
@@ -588,10 +641,47 @@
     for (i = 0; i < ranked.length; i += 1) {
       account = ranked[i];
       if (!account || typeof account.username !== "string" || !account.username.trim()) continue;
+      place += 1;
+      nextSnap.push({
+        name: account.username.trim(),
+        money: accountMoney(account),
+        place: place,
+      });
+    }
+    signature = rankingSignature(nextSnap);
+    if (signature === lastPaintedRankingSig && list.children.length === nextSnap.length) return;
+    list.textContent = "";
+    for (i = 0; i < nextSnap.length; i += 1) {
+      name = nextSnap[i].name;
+      money = nextSnap[i].money;
+      place = nextSnap[i].place;
       item = document.createElement("li");
-      item.textContent = account.username.trim() + " ($" + accountMoney(account) + ")";
+      item.textContent = name + " ($" + money + ")";
+      oldPlace = prevPlaces[name.toLowerCase()];
+      if (previous && typeof oldPlace === "number") {
+        if (place < oldPlace) {
+          item.className = "rank-up";
+          item.setAttribute("aria-label", name + " subiu no ranking");
+        } else if (place > oldPlace) {
+          item.className = "rank-down";
+          item.setAttribute("aria-label", name + " desceu no ranking");
+        }
+      }
       list.appendChild(item);
     }
+    lastPaintedRankingSig = signature;
+    writeRankingSnapshot(nextSnap);
+  }
+
+  function refreshHomeRanking() {
+    if (!isHomePage() || !document.querySelector(".ranking")) return;
+    syncAccounts()
+      .then(function () {
+        paintRanking();
+      })
+      .catch(function () {
+        paintRanking();
+      });
   }
 
   function paintAccount() {
