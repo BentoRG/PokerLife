@@ -3,7 +3,8 @@
   var SESSION_KEY = "pokerlife.session";
   // Shared cloud key so the same username/password works in any browser.
   // ExtendsClass PUTs fail browser CORS preflight (OPTIONS 500); KVdb allows cross-origin read/write.
-  var CLOUD_URL = "https://kvdb.io/HmDEK9RXFZRnF1iG7XRCV4/accounts";
+  var CLOUD_BUCKET = "https://kvdb.io/HmDEK9RXFZRnF1iG7XRCV4/";
+  var CLOUD_URL = CLOUD_BUCKET + "accounts";
   var STARTING_MONEY = 150;
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
@@ -1404,7 +1405,58 @@
     });
   }
 
+  function roomUrl(code) {
+    var key = String(code || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 8);
+    if (!key) return null;
+    return CLOUD_BUCKET + "room-" + key;
+  }
+
+  function loadRoom(code) {
+    var url = roomUrl(code);
+    if (!url) return Promise.reject(new Error("invalid room"));
+    return fetch(url + "?t=" + Date.now(), {
+      method: "GET",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    }).then(function (response) {
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error("room read failed");
+      return response.json();
+    });
+  }
+
+  function saveRoom(code, room) {
+    var url = roomUrl(code);
+    if (!url) return Promise.reject(new Error("invalid room"));
+    room = room || {};
+    room.updatedAt = Date.now();
+    return fetch(url, {
+      method: "PUT",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(room),
+    }).then(function (response) {
+      if (!response.ok) throw new Error("room write failed");
+      return room;
+    });
+  }
+
+  function deleteRoom(code) {
+    var url = roomUrl(code);
+    if (!url) return Promise.resolve();
+    return fetch(url, { method: "DELETE", cache: "no-store" }).then(function () {
+      return null;
+    }).catch(function () {
+      return null;
+    });
+  }
+
   window.PokerLifeAuth = {
+    currentUser: currentUser,
     currentMoney: currentMoney,
     setMoney: setMoney,
     buyItem: buyItem,
@@ -1416,6 +1468,16 @@
     repayLoan: repayLoan,
     loanOwed: function () {
       return loanOwed(findAccount(currentUser() || ""));
+    },
+    loadRoom: loadRoom,
+    saveRoom: saveRoom,
+    deleteRoom: deleteRoom,
+    normalizeRoomCode: function (code) {
+      return String(code || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 8);
     },
     gameSpeed: readGameSpeed,
     setGameSpeed: writeGameSpeed,

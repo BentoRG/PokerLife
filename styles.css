@@ -1084,10 +1084,128 @@ main {
   background: #f3f3f3;
 }
 
-#play-friends {
+#play-friends:hover {
+  background: #f3f3f3;
+}
+
+.friends-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  width: min(28rem, calc(100vw - 2rem));
+  margin-top: 2.4rem;
+}
+
+.friends-lobby[hidden] {
+  display: none;
+}
+
+.friends-setup,
+.friends-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.friends-setup[hidden],
+.friends-waiting[hidden] {
+  display: none;
+}
+
+.friends-code-label {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.friends-code-label input {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.friends-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.friends-lobby button,
+.leave-match {
+  margin: 0;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font-family: inherit;
+  font-size: 1.08rem;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.friends-lobby button:hover,
+.leave-match:hover {
+  background: #f3f3f3;
+}
+
+.friends-lobby button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.friends-back,
+.leave-match {
   background: #eee;
-  color: #595959;
-  cursor: not-allowed;
+}
+
+.friends-code-line,
+.friends-blinds,
+.friends-wait-note {
+  margin: 0;
+  text-align: center;
+  font-size: 1.08rem;
+}
+
+.room-players {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #000;
+  background: #fff;
+  list-style: none;
+  text-align: left;
+  font-size: 1.08rem;
+}
+
+.room-players li + li {
+  margin-top: 0.25rem;
+}
+
+.leave-match {
+  width: min(18rem, 100%);
+  margin-top: 0.65rem;
+}
+
+.leave-match[hidden] {
+  display: none;
+}
+
+.friends-wait-note {
+  width: 100%;
+  padding: 0.45rem 0.2rem;
 }
 
 .mode-select button:focus-visible {
@@ -1105,6 +1223,7 @@ main {
 }
 
 .mode-select[hidden],
+.friends-lobby[hidden],
 #match[hidden],
 #hand-guide[hidden],
 .mode-notice[hidden] {
@@ -1265,6 +1384,7 @@ main {
   .menu,
   .auth-block,
   .mode-select,
+  .friends-lobby,
   .felt,
   .controls,
   .hand-log,

@@ -27,13 +27,35 @@
         <div class="cassino-play">
           <div id="mode-select" class="mode-select">
             <button type="button" id="play-bots">Jogar Texas Hold'em com bots</button>
-            <button type="button" id="play-friends" aria-disabled="true">Jogar Texas Hold'em com amigos</button>
+            <button type="button" id="play-friends">Jogar Texas Hold'em com amigos</button>
             <p id="mode-notice" class="mode-notice" hidden role="status"></p>
+          </div>
+          <div id="friends-lobby" class="friends-lobby" hidden>
+            <div id="friends-setup" class="friends-setup">
+              <label class="friends-code-label">
+                <span>Código da sala</span>
+                <input id="room-code" name="room-code" maxlength="8" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="friends-actions">
+                <button type="button" id="create-room">Criar sala</button>
+                <button type="button" id="join-room">Entrar na sala</button>
+              </div>
+              <button type="button" id="friends-back" class="friends-back">Voltar</button>
+            </div>
+            <div id="friends-waiting" class="friends-waiting" hidden>
+              <p class="friends-code-line">Código: <strong id="room-code-display"></strong></p>
+              <p class="friends-blinds">Blinds fixos: $10 / $20</p>
+              <ul id="room-players" class="room-players"></ul>
+              <button type="button" id="start-friends-game" hidden>Iniciar jogo</button>
+              <button type="button" id="leave-room">Sair da sala</button>
+            </div>
+            <p id="friends-notice" class="mode-notice" hidden role="status"></p>
           </div>
           <div id="match" hidden>
             <div id="table" class="felt"></div>
             <div class="controls">
               <div id="actions" class="actions"></div>
+              <button type="button" id="leave-match" class="leave-match" hidden>Sair da partida</button>
             </div>
             <ol id="log" class="hand-log" aria-live="polite"></ol>
           </div>
