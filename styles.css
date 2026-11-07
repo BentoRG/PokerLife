@@ -319,6 +319,11 @@ main {
   padding-bottom: 2rem;
 }
 
+.table-main:has(.account-card) {
+  align-items: center;
+  padding-right: 1.25rem;
+}
+
 .cassino-layout {
   position: relative;
   display: block;
@@ -488,7 +493,7 @@ main {
 
 .account-card {
   width: min(26rem, calc(100vw - 2rem));
-  margin-top: 2.4rem;
+  margin: 2.4rem auto 0;
   padding: 1.35rem 1.45rem 1.55rem;
   border: 1px solid #000;
   background: #fff;
