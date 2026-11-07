@@ -10,6 +10,9 @@
   var SUNDAY_ALLOWANCE = 200;
   var ALLOWANCE_HOUR = 7;
   var BROKE_ALLOWANCE_CUT = 25;
+  var SAVINGS_DAILY_RATE = 0.0005;
+  var LOAN_PRINCIPAL = 100;
+  var LOAN_DAILY_FEE = 5;
   var RESET_TOKEN_MS = 2 * 60 * 60 * 1000;
   var GAME_SPEED_KEY = "pokerlife.gameSpeed";
   var GAME_SPEED_SCALES = {
@@ -421,6 +424,189 @@
     return (delta > 0 ? "+" : "-") + "$" + Math.abs(delta) + " → " + label;
   }
 
+  function startOfLocalDay(ms) {
+    var date = new Date(typeof ms === "number" && isFinite(ms) ? ms : Date.now());
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  }
+
+  function daysBetween(fromMs, toMs) {
+    return Math.max(0, Math.round((startOfLocalDay(toMs) - startOfLocalDay(fromMs)) / 86400000));
+  }
+
+  function parseLocalDateInput(value) {
+    var match;
+    var year;
+    var month;
+    var day;
+    if (typeof value !== "string") return null;
+    match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+    if (!match) return null;
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+    if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+    var date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    return date.getTime();
+  }
+
+  function formatLocalDate(ms) {
+    var date = new Date(startOfLocalDay(ms));
+    function pad(value) {
+      return (value < 10 ? "0" : "") + value;
+    }
+    return pad(date.getDate()) + "/" + pad(date.getMonth() + 1) + "/" + date.getFullYear();
+  }
+
+  function savingsPayout(amount, days) {
+    var principal = Math.max(0, Math.round(amount));
+    var stayed = Math.max(0, Math.round(days));
+    return Math.ceil(principal * (1 + SAVINGS_DAILY_RATE * stayed));
+  }
+
+  function readSavings(account) {
+    var list = account && account.savings;
+    var out = [];
+    var i;
+    var entry;
+    var amount;
+    var depositedAt;
+    var matureAt;
+    if (!Array.isArray(list)) return out;
+    for (i = 0; i < list.length; i += 1) {
+      entry = list[i];
+      if (!entry || typeof entry !== "object") continue;
+      amount = Math.round(Number(entry.amount));
+      depositedAt = Number(entry.depositedAt);
+      matureAt = Number(entry.matureAt);
+      if (!isFinite(amount) || amount <= 0) continue;
+      if (!isFinite(depositedAt) || !isFinite(matureAt)) continue;
+      out.push({ amount: amount, depositedAt: depositedAt, matureAt: matureAt });
+    }
+    return out;
+  }
+
+  function settleMaturedSavings(account, now) {
+    var when = typeof now === "number" && isFinite(now) ? now : Date.now();
+    var today = startOfLocalDay(when);
+    var open = [];
+    var paid = 0;
+    var list;
+    var i;
+    var entry;
+    var days;
+    var payout;
+    if (!account) return 0;
+    list = readSavings(account);
+    for (i = 0; i < list.length; i += 1) {
+      entry = list[i];
+      if (startOfLocalDay(entry.matureAt) > today) {
+        open.push(entry);
+        continue;
+      }
+      days = daysBetween(entry.depositedAt, entry.matureAt);
+      payout = savingsPayout(entry.amount, days);
+      account.money = accountMoney(account) + payout;
+      pushLedger(account, payout, "retorno da poupança");
+      paid += 1;
+    }
+    account.savings = open;
+    return paid;
+  }
+
+  function depositSavings(amount, dateValue) {
+    var principal = Math.round(Number(amount));
+    var matureAt = parseLocalDateInput(dateValue);
+    var today = startOfLocalDay(Date.now());
+    var result = { ok: false, error: "Não foi possível guardar na poupança." };
+    if (!isFinite(principal) || principal <= 0) {
+      return { ok: false, error: "Informe um valor válido." };
+    }
+    if (matureAt === null) {
+      return { ok: false, error: "Informe uma data válida." };
+    }
+    if (matureAt <= today) {
+      return { ok: false, error: "Escolha uma data futura." };
+    }
+    if (!updateAccount(function (account) {
+      var money;
+      settleMaturedSavings(account);
+      money = accountMoney(account);
+      if (money < principal) {
+        result = { ok: false, error: "Dinheiro insuficiente." };
+        return;
+      }
+      account.money = money - principal;
+      if (!Array.isArray(account.savings)) account.savings = [];
+      account.savings.push({
+        amount: principal,
+        depositedAt: Date.now(),
+        matureAt: matureAt,
+      });
+      pushLedger(account, -principal, "depósito na poupança");
+      maybeBroke(account, money, account.money);
+      result = { ok: true, error: "" };
+    })) return result;
+    return result;
+  }
+
+  function readLoan(account) {
+    var loan = account && account.loan;
+    var takenAt;
+    if (!loan || typeof loan !== "object") return null;
+    takenAt = Number(loan.takenAt);
+    if (!isFinite(takenAt)) return null;
+    return { takenAt: takenAt };
+  }
+
+  function loanOwed(account, now) {
+    var loan = readLoan(account);
+    var when = typeof now === "number" && isFinite(now) ? now : Date.now();
+    if (!loan) return 0;
+    return LOAN_PRINCIPAL + LOAN_DAILY_FEE * daysBetween(loan.takenAt, when);
+  }
+
+  function takeLoan() {
+    var result = { ok: false, error: "Não foi possível pedir o empréstimo." };
+    if (!updateAccount(function (account) {
+      settleMaturedSavings(account);
+      if (readLoan(account)) {
+        result = { ok: false, error: "Pague o empréstimo atual antes de pedir outro." };
+        return;
+      }
+      account.money = accountMoney(account) + LOAN_PRINCIPAL;
+      account.loan = { takenAt: Date.now() };
+      pushLedger(account, LOAN_PRINCIPAL, "empréstimo");
+      result = { ok: true, error: "" };
+    })) return result;
+    return result;
+  }
+
+  function repayLoan() {
+    var result = { ok: false, error: "Não foi possível pagar o empréstimo." };
+    if (!updateAccount(function (account) {
+      var owed;
+      var money;
+      settleMaturedSavings(account);
+      if (!readLoan(account)) {
+        result = { ok: false, error: "Você não tem empréstimo em aberto." };
+        return;
+      }
+      owed = loanOwed(account);
+      money = accountMoney(account);
+      if (money < owed) {
+        result = { ok: false, error: "Dinheiro insuficiente para pagar $" + owed + "." };
+        return;
+      }
+      account.money = money - owed;
+      delete account.loan;
+      pushLedger(account, -owed, "pagamento do empréstimo");
+      maybeBroke(account, money, account.money);
+      result = { ok: true, error: "" };
+    })) return result;
+    return result;
+  }
+
   function allowancePenaltyOf(account) {
     var value = account && account.allowancePenalty;
     if (typeof value !== "number" || !isFinite(value)) return 0;
@@ -508,6 +694,7 @@
     var windowStart = allowanceWindowStart(now);
     var claimed = false;
     updateAccount(function (account) {
+      settleMaturedSavings(account, now);
       if (account.allowanceClaimedWindow === windowStart) return;
       account.money = accountMoney(account) + allowanceAmount(now);
       account.allowanceClaimedWindow = windowStart;
@@ -684,17 +871,190 @@
       });
   }
 
+  function ensureSavingsSettled() {
+    var paid = 0;
+    var name = currentUser();
+    var account = findAccount(name || "");
+    if (!account) return 0;
+    if (!readSavings(account).some(function (entry) {
+      return startOfLocalDay(entry.matureAt) <= startOfLocalDay(Date.now());
+    })) return 0;
+    updateAccount(function (entry) {
+      paid = settleMaturedSavings(entry);
+    });
+    return paid;
+  }
+
+  function tomorrowDateInputValue() {
+    var date = new Date(startOfLocalDay(Date.now()) + 86400000);
+    function pad(value) {
+      return (value < 10 ? "0" : "") + value;
+    }
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+  }
+
+  function paintBankMoney() {
+    var node = document.querySelector(".bank-money");
+    if (node) node.textContent = "$" + currentMoney();
+  }
+
+  function paintSavingsList(account) {
+    var box = document.querySelector(".savings-list");
+    var list;
+    var i;
+    var entry;
+    var line;
+    var days;
+    var payout;
+    if (!box) return;
+    box.textContent = "";
+    list = readSavings(account);
+    if (!list.length) {
+      line = document.createElement("p");
+      line.textContent = "Nenhuma poupança em andamento.";
+      box.appendChild(line);
+      return;
+    }
+    for (i = 0; i < list.length; i += 1) {
+      entry = list[i];
+      days = daysBetween(entry.depositedAt, entry.matureAt);
+      payout = savingsPayout(entry.amount, days);
+      line = document.createElement("p");
+      line.textContent =
+        "$" +
+        entry.amount +
+        " → recebe $" +
+        payout +
+        " em " +
+        formatLocalDate(entry.matureAt) +
+        " (" +
+        days +
+        (days === 1 ? " dia" : " dias") +
+        ")";
+      box.appendChild(line);
+    }
+  }
+
+  function paintLoanPanel(account) {
+    var status = document.querySelector(".loan-status");
+    var take = document.querySelector(".loan-take");
+    var repay = document.querySelector(".loan-repay");
+    var loan = readLoan(account);
+    var owed;
+    var days;
+    if (!status || !take || !repay) return;
+    if (!loan) {
+      status.textContent = "Você não tem empréstimo em aberto.";
+      take.hidden = false;
+      take.disabled = false;
+      repay.hidden = true;
+      return;
+    }
+    owed = loanOwed(account);
+    days = daysBetween(loan.takenAt, Date.now());
+    status.textContent =
+      "Empréstimo em aberto desde " +
+      formatLocalDate(loan.takenAt) +
+      ": pagar $" +
+      owed +
+      " ($100 + $" +
+      LOAN_DAILY_FEE +
+      " × " +
+      days +
+      (days === 1 ? " dia" : " dias") +
+      ").";
+    take.hidden = true;
+    repay.hidden = false;
+  }
+
+  function paintBank() {
+    var account;
+    if (!document.querySelector(".bank-card")) return;
+    ensureSavingsSettled();
+    account = findAccount(currentUser() || "");
+    paintBankMoney();
+    paintSavingsList(account);
+    paintLoanPanel(account);
+    paintLedger(account);
+  }
+
+  function showBankNotice(message) {
+    var notice = document.getElementById("bank-notice");
+    if (!notice) return;
+    notice.hidden = !message;
+    notice.textContent = message || "";
+  }
+
+  function bindBankForms() {
+    var form = document.querySelector("#savings-form");
+    var take = document.querySelector(".loan-take");
+    var repay = document.querySelector(".loan-repay");
+    var dateInput;
+    if (form && !form.dataset.bound) {
+      form.dataset.bound = "1";
+      dateInput = form.querySelector('input[name="date"]');
+      if (dateInput) dateInput.min = tomorrowDateInputValue();
+      form.addEventListener("submit", function (event) {
+        var data = new FormData(form);
+        var result;
+        event.preventDefault();
+        result = depositSavings(data.get("amount"), data.get("date"));
+        if (!result.ok) {
+          showBankNotice(result.error);
+          return;
+        }
+        form.reset();
+        if (dateInput) dateInput.min = tomorrowDateInputValue();
+        showBankNotice("Valor guardado na poupança.");
+        paintBalance();
+        paintBank();
+        paintRanking();
+      });
+    }
+    if (take && !take.dataset.bound) {
+      take.dataset.bound = "1";
+      take.addEventListener("click", function () {
+        var result = takeLoan();
+        if (!result.ok) {
+          showBankNotice(result.error);
+          return;
+        }
+        showBankNotice("Empréstimo de $100 recebido.");
+        paintBalance();
+        paintBank();
+        paintRanking();
+      });
+    }
+    if (repay && !repay.dataset.bound) {
+      repay.dataset.bound = "1";
+      repay.addEventListener("click", function () {
+        var result = repayLoan();
+        if (!result.ok) {
+          showBankNotice(result.error);
+          return;
+        }
+        showBankNotice("Empréstimo pago.");
+        paintBalance();
+        paintBank();
+        paintRanking();
+      });
+    }
+  }
+
   function paintAccount() {
     var name = currentUser();
     var welcome = document.querySelector(".welcome-name");
     var profile = document.querySelector(".profile-name");
     var button = document.querySelector(".allowance-claim");
+    ensureSavingsSettled();
     if (welcome && name) welcome.textContent = name;
     if (profile && name) profile.textContent = name;
     paintBalance();
     paintAllowance();
     paintBrokeNotice();
     paintProfile();
+    paintBank();
+    bindBankForms();
     paintRanking();
     if (button && !button.dataset.bound) {
       button.dataset.bound = "1";
@@ -1050,6 +1410,12 @@
     buyItem: buyItem,
     items: function () {
       return readItems(findAccount(currentUser() || "")).slice();
+    },
+    depositSavings: depositSavings,
+    takeLoan: takeLoan,
+    repayLoan: repayLoan,
+    loanOwed: function () {
+      return loanOwed(findAccount(currentUser() || ""));
     },
     gameSpeed: readGameSpeed,
     setGameSpeed: writeGameSpeed,

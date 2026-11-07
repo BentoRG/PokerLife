@@ -112,10 +112,10 @@ main {
 
 .menu {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: min(36.125rem, calc(100vw - 2.5rem));
   max-width: calc(100vw - 2.5rem);
-  aspect-ratio: 3 / 1;
+  aspect-ratio: 2 / 1;
   margin-top: 0.7rem;
   border: 1px solid #000;
   background: #eee;
@@ -141,9 +141,14 @@ main {
   cursor: pointer;
 }
 
-.menu button:last-child,
-.menu a:last-child {
+.menu button:nth-child(2n),
+.menu a:nth-child(2n) {
   border-right: 0;
+}
+
+.menu button:nth-child(n + 3),
+.menu a:nth-child(n + 3) {
+  border-top: 1px solid #000;
 }
 
 .menu button:hover,
@@ -611,6 +616,84 @@ main {
 .ledger-toggle:focus-visible {
   outline: 2px solid #595959;
   outline-offset: 2px;
+}
+
+.bank-card .bank-balance {
+  margin: 0;
+}
+
+.bank-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.7rem;
+}
+
+.bank-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.bank-form input {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 1.05rem;
+}
+
+.bank-form button,
+.loan-panel button {
+  margin-top: 0.15rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #000;
+  background: #eee;
+  color: #000;
+  font: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.bank-form button:hover,
+.loan-panel button:hover {
+  background: #e4e4e4;
+}
+
+.bank-form button:focus-visible,
+.loan-panel button:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: 2px;
+}
+
+.bank-form button:disabled,
+.loan-panel button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.savings-list {
+  margin-top: 0.75rem;
+}
+
+.savings-list p,
+.loan-status {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+}
+
+.loan-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  margin-top: 0.7rem;
+}
+
+.loan-panel .loan-status {
+  flex: 1 1 100%;
 }
 
 .settings-note {

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="auth.js"></script>
+    <title>Banco — PokerLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header login-header">
+      <div class="brand">
+        <h1>PokerLife</h1>
+        <p class="subtitle">A vida até o que um herdeiro conhece</p>
+      </div>
+      <p class="login-title">Banco</p>
+    </header>
+
+    <main class="table-main">
+      <section class="account-card bank-card">
+        <p class="bank-balance">Saldo atual: <span class="bank-money"></span></p>
+
+        <h2>Poupança</h2>
+        <p class="settings-note">
+          Guarde um valor até a data escolhida e receba o valor + 0,05% ao dia, arredondado para cima.
+        </p>
+        <form id="savings-form" class="bank-form">
+          <label>
+            <span>Valor ($)</span>
+            <input type="number" name="amount" min="1" step="1" required />
+          </label>
+          <label>
+            <span>Data para receber</span>
+            <input type="date" name="date" required />
+          </label>
+          <button type="submit">Guardar na poupança</button>
+        </form>
+        <div class="savings-list" aria-live="polite"></div>
+
+        <h2>Empréstimos</h2>
+        <p class="settings-note">
+          Receba $100 agora. A dívida é $100 + $5 por dia desde o empréstimo. Só um empréstimo por vez.
+        </p>
+        <div class="loan-panel">
+          <p class="loan-status"></p>
+          <button type="button" class="loan-take">Pedir empréstimo de $100</button>
+          <button type="button" class="loan-repay" hidden>Pagar empréstimo</button>
+        </div>
+
+        <h2>Registro bancário:</h2>
+        <div class="account-ledger"></div>
+      </section>
+
+      <p id="bank-notice" class="mode-notice" hidden role="status"></p>
+      <p class="table-nav"><a href="index.html">Voltar à página inicial</a></p>
+    </main>
+  </body>
+</html>
