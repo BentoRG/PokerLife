@@ -500,7 +500,7 @@ main {
   color: #000;
   text-align: left;
   font-size: 1.28rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.35;
 }
 
@@ -510,6 +510,11 @@ main {
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
+}
+
+.account-card h2,
+.account-label {
+  font-weight: 700;
 }
 
 .account-card h2,
