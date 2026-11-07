@@ -686,22 +686,45 @@
     }
   }
 
+  var ledgerExpanded = false;
+  var LEDGER_PREVIEW = 5;
+
   function paintLedger(account) {
     var box = document.querySelector(".account-ledger");
     var entries;
+    var valid = [];
+    var visible;
     var i;
     var entry;
     var line;
+    var toggle;
     if (!box) return;
     box.textContent = "";
     entries = account && Array.isArray(account.ledger) ? account.ledger : [];
     for (i = entries.length - 1; i >= 0; i -= 1) {
       entry = entries[i];
       if (!entry || typeof entry.delta !== "number" || !entry.label) continue;
+      valid.push(entry);
+    }
+    visible = ledgerExpanded ? valid : valid.slice(0, LEDGER_PREVIEW);
+    for (i = 0; i < visible.length; i += 1) {
       line = document.createElement("p");
       line.className = "ledger";
-      line.textContent = ledgerText(entry.delta, entry.label);
+      line.textContent = ledgerText(visible[i].delta, visible[i].label);
       box.appendChild(line);
+    }
+    if (valid.length > LEDGER_PREVIEW) {
+      toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "ledger-toggle";
+      toggle.textContent = ledgerExpanded ? "Contrair" : "Expandir";
+      toggle.addEventListener("click", function () {
+        ledgerExpanded = !ledgerExpanded;
+        paintLedger(findAccount(currentUser() || "") || account);
+      });
+      box.appendChild(toggle);
+    } else {
+      ledgerExpanded = false;
     }
   }
 

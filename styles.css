@@ -535,6 +535,26 @@ main {
   margin-top: 0.15rem;
 }
 
+.ledger-toggle {
+  display: inline-block;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  cursor: pointer;
+}
+
+.ledger-toggle:focus-visible {
+  outline: 2px solid #595959;
+  outline-offset: 2px;
+}
+
 .settings-note {
   margin-top: 0.35rem !important;
   font-size: 0.95rem !important;
