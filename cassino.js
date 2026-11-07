@@ -44,6 +44,8 @@
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
+  // Bot 4 picks one of the other three personalities at random each hand.
+  var raviStyle = null;
 
   function clearMatchSave() {
     try {
@@ -65,6 +67,7 @@
           shownHoles: shownHoles,
           handClosing: handClosing,
           statusMessage: statusMessage,
+          raviStyle: raviStyle,
         })
       );
     } catch (error) {}
@@ -174,22 +177,55 @@
     return clamp(raw, legal.minRaiseTo, legal.maxRaiseTo);
   }
 
-  // Bot difficulties: 1=6/10, 2=11/10, 3=8/10, 4=10/10.
+  // Bot difficulties: all 10/10 (maximum).
   var SKILL = {
-    lia: 6,
-    caio: 11,
-    duda: 8,
+    lia: 10,
+    caio: 10,
+    duda: 10,
     ravi: 10,
   };
 
+  var STYLES = ["calling-station", "bluffer", "maniac"];
+
   function skillOf(player) {
     var skill = SKILL[player.id];
-    return skill == null ? 5 : skill;
+    return skill == null ? 10 : skill;
   }
 
-  function chooseBot(table) {
-    var legal = Poker.legalActions(table);
-    var player = table.players[table.toAct];
+  function pickRaviStyle() {
+    raviStyle = STYLES[Math.floor(Math.random() * STYLES.length)];
+  }
+
+  function styleOf(player) {
+    if (player.id === "lia") return "calling-station";
+    if (player.id === "caio") return "bluffer";
+    if (player.id === "duda") return "maniac";
+    if (player.id === "ravi") return raviStyle || "calling-station";
+    return "calling-station";
+  }
+
+  function hasMadeCombination(player, table) {
+    var made;
+    if (!table.board.length) return false;
+    made = Poker.rankCards(player.hole.concat(table.board));
+    return !!(made && made[0] >= 1);
+  }
+
+  function hasGoodDrawChance(player, table) {
+    var cards;
+    var draw;
+    if (!table.board.length || table.board.length >= 5) return false;
+    cards = player.hole.concat(table.board);
+    if (hasFlushDraw(cards)) return true;
+    draw = straightDraw(cards);
+    return !!(draw.openEnded || draw.gutshot);
+  }
+
+  function canContinuePostflop(player, table) {
+    return hasMadeCombination(player, table) || hasGoodDrawChance(player, table);
+  }
+
+  function chooseSkillful(table, legal, player) {
     var skill = skillOf(player);
     var error = (10 - skill) / 10;
     var trueScore = strength(player, table);
@@ -227,6 +263,70 @@
     if (legal.check) return { type: "check" };
     if (legal.fold) return { type: "fold" };
     return { type: "check" };
+  }
+
+  // Bot 1: always continues preflop; postflop only with a made hand or strong draw.
+  function chooseCallingStation(table, legal, player) {
+    var score = strength(player, table);
+    if (!table.board.length) {
+      if (legal.call > 0) {
+        if (legal.minRaiseTo != null && score >= 0.62 && Math.random() < 0.92) {
+          return { type: "raise", to: sizedBet(table, legal, 1) };
+        }
+        return { type: "call" };
+      }
+      if (legal.minRaiseTo != null && score >= 0.62 && Math.random() < 0.94) {
+        return { type: "raise", to: sizedBet(table, legal, 1) };
+      }
+      if (legal.minRaiseTo != null && score >= 0.48 && Math.random() < 0.42) {
+        return { type: "raise", to: sizedBet(table, legal, 0.55) };
+      }
+      if (legal.check) return { type: "check" };
+      return { type: "call" };
+    }
+    if (!canContinuePostflop(player, table)) {
+      if (legal.check) return { type: "check" };
+      if (legal.fold) return { type: "fold" };
+      return { type: "check" };
+    }
+    return chooseSkillful(table, legal, player);
+  }
+
+  // Bot 2: bluffs 3 out of 5 times when the hand is not strong enough to value-bet.
+  function chooseBluffer(table, legal, player) {
+    var score = strength(player, table);
+    if (legal.minRaiseTo != null && score < 0.62 && Math.random() < 0.6) {
+      return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.66 : 1) };
+    }
+    return chooseSkillful(table, legal, player);
+  }
+
+  // Bot 3: frequent oversized bets and all-ins.
+  function chooseManiac(table, legal, player) {
+    var score = strength(player, table);
+    if (legal.minRaiseTo != null && (score >= 0.4 || Math.random() < 0.58)) {
+      if (Math.random() < 0.48) return { type: "raise", to: legal.maxRaiseTo };
+      return { type: "raise", to: sizedBet(table, legal, 1.4) };
+    }
+    if (legal.call > 0) {
+      if (score >= 0.28) return { type: "call" };
+      return legal.fold ? { type: "fold" } : { type: "call" };
+    }
+    if (legal.check) return { type: "check" };
+    if (legal.fold) return { type: "fold" };
+    return { type: "check" };
+  }
+
+  function chooseByStyle(style, table, legal, player) {
+    if (style === "bluffer") return chooseBluffer(table, legal, player);
+    if (style === "maniac") return chooseManiac(table, legal, player);
+    return chooseCallingStation(table, legal, player);
+  }
+
+  function chooseBot(table) {
+    var legal = Poker.legalActions(table);
+    var player = table.players[table.toAct];
+    return chooseByStyle(styleOf(player), table, legal, player);
   }
 
   function later(fn, ms) {
@@ -512,6 +612,8 @@
     handClosing = !!saved.handClosing;
     logCursor = 0;
     statusMessage = saved.statusMessage || "";
+    raviStyle = STYLES.indexOf(saved.raviStyle) >= 0 ? saved.raviStyle : null;
+    if (!raviStyle) pickRaviStyle();
     hideNotice();
     document.getElementById("mode-select").hidden = true;
     document.getElementById("match").hidden = false;
@@ -1091,6 +1193,7 @@
     shownBoard = 0;
     shownHoles = false;
     handClosing = false;
+    pickRaviStyle();
     if (actions) clear(actions);
     if (raiseBox) raiseBox.remove();
     document.documentElement.style.removeProperty("--dock-height");
