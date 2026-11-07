@@ -1,6 +1,5 @@
 (function () {
   var START = 500;
-  var BOT_STACK = 200;
   var SB = 5;
   var BB = 10;
   var BOT_PAUSE = 1700;
@@ -567,6 +566,12 @@
     return START;
   }
 
+  function botStack() {
+    var money = heroMoney();
+    if (!isFinite(money) || money <= 0) return 100;
+    return Math.ceil(money / 100) * 100;
+  }
+
   function saveHeroMoney() {
     var i;
     if (typeof window === "undefined" || !window.PokerLifeAuth || !roster) return;
@@ -579,12 +584,13 @@
   }
 
   function freshRoster() {
+    var stack = botStack();
     roster = [
       { id: "hero", name: "Você", stack: heroMoney(), isHuman: true },
-      { id: "lia", name: "Bot 1", stack: BOT_STACK, isHuman: false },
-      { id: "caio", name: "Bot 2", stack: BOT_STACK, isHuman: false },
-      { id: "duda", name: "Bot 3", stack: BOT_STACK, isHuman: false },
-      { id: "ravi", name: "Bot 4", stack: BOT_STACK, isHuman: false },
+      { id: "lia", name: "Bot 1", stack: stack, isHuman: false },
+      { id: "caio", name: "Bot 2", stack: stack, isHuman: false },
+      { id: "duda", name: "Bot 3", stack: stack, isHuman: false },
+      { id: "ravi", name: "Bot 4", stack: stack, isHuman: false },
     ];
     button = roster.length - 1;
   }
