@@ -47,6 +47,9 @@
   var raviStyle = null;
   // Stack bots started the match with; used so richer bots fold less and poorer ones fold more.
   var startStack = START;
+  // Blinds fixed when the player enters the cassino (3% of their money for the big blind).
+  var matchSb = SB;
+  var matchBb = BB;
 
   function clearMatchSave() {
     try {
@@ -70,6 +73,8 @@
           statusMessage: statusMessage,
           raviStyle: raviStyle,
           startStack: startStack,
+          matchSb: matchSb,
+          matchBb: matchBb,
         })
       );
     } catch (error) {}
@@ -708,6 +713,16 @@
     return START;
   }
 
+  // Big blind is 3% of the player's money on entry, rounded down; small blind is half of that.
+  function blindsForMoney(money) {
+    var bb;
+    if (!isFinite(money) || money <= 0) {
+      return { sb: SB, bb: BB };
+    }
+    bb = Math.max(1, Math.floor(money * 0.03));
+    return { sb: Math.max(1, Math.floor(bb / 2)), bb: bb };
+  }
+
   function botStack() {
     var money = heroMoney();
     if (!isFinite(money) || money <= 0) return 100;
@@ -726,10 +741,14 @@
   }
 
   function freshRoster() {
+    var money = heroMoney();
     var stack = botStack();
+    var blinds = blindsForMoney(money);
     startStack = stack;
+    matchSb = blinds.sb;
+    matchBb = blinds.bb;
     roster = [
-      { id: "hero", name: "Você", stack: heroMoney(), isHuman: true },
+      { id: "hero", name: "Você", stack: money, isHuman: true },
       { id: "lia", name: "Bot 1", stack: stack, isHuman: false },
       { id: "caio", name: "Bot 2", stack: stack, isHuman: false },
       { id: "duda", name: "Bot 3", stack: stack, isHuman: false },
@@ -762,6 +781,8 @@
     logCursor = 0;
     statusMessage = saved.statusMessage || "";
     startStack = saved.startStack > 0 ? saved.startStack : botStack();
+    matchSb = saved.matchSb > 0 ? saved.matchSb : blindsForMoney(heroMoney()).sb;
+    matchBb = saved.matchBb > 0 ? saved.matchBb : blindsForMoney(heroMoney()).bb;
     raviStyle = STYLES.indexOf(saved.raviStyle) >= 0 ? saved.raviStyle : null;
     if (!raviStyle) pickRaviStyle();
     hideNotice();
@@ -1357,8 +1378,8 @@
     state = Poker.createHand({
       players: roster,
       button: button,
-      sb: SB,
-      bb: BB,
+      sb: matchSb,
+      bb: matchBb,
     });
     logCursor = 0;
     marker("Nova mão · dealer com " + roster[button].name);
@@ -1392,6 +1413,7 @@
       estimateBetMeaning: estimateBetMeaning,
       withBigBetFear: withBigBetFear,
       comboLooksStrong: comboLooksStrong,
+      blindsForMoney: blindsForMoney,
     };
   }
 })();

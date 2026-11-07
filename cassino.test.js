@@ -118,6 +118,13 @@ check("withBigBetFear often folds weak hands to huge bets", function () {
   assert.ok(folds >= 20, "expected frequent folds to a huge bet with trash, got " + folds);
 });
 
+check("blindsForMoney uses 3% of money floored for the big blind", function () {
+  assert.deepStrictEqual(Cassino.blindsForMoney(1000), { sb: 15, bb: 30 });
+  assert.deepStrictEqual(Cassino.blindsForMoney(333), { sb: 4, bb: 9 });
+  assert.deepStrictEqual(Cassino.blindsForMoney(10), { sb: 1, bb: 1 });
+  assert.deepStrictEqual(Cassino.blindsForMoney(0), { sb: 5, bb: 10 });
+});
+
 check("withBigBetFear keeps strong hands against big bets", function () {
   var state = tableFacingBet({
     deck: ["As", "9h", "Ad", "8h", "Kh", "Kd", "7c", "4d", "5c", "6s", "Ts", "Jc"],
