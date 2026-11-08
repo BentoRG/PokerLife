@@ -326,7 +326,7 @@
   }
 
   function pickManiacMood() {
-    maniacWildHand = Math.random() < 0.2;
+    maniacWildHand = Math.random() < 0.12;
     maniacFired = false;
   }
 
@@ -380,8 +380,10 @@
       ) {
         return { type: "raise", to: sizedBet(table, legal, skill >= 9 ? 0.66 : Math.random() < 0.5 ? 0.25 : 1.25) };
       }
-      if (score + error * 0.28 >= price && score >= 0.2 - error * 0.18) return { type: "call" };
-      if (Math.random() < error * 0.38) return { type: "call" };
+      if (score + error * 0.35 >= price && score >= 0.1 - error * 0.2) return { type: "call" };
+      if (Math.random() < error * 0.55) return { type: "call" };
+      // Prefer calling cheap prices instead of folding light.
+      if (price <= 0.3 && score >= 0.06 && Math.random() < 0.62) return { type: "call" };
       if (trueScore >= 0.8 && Math.random() < error * 0.22) return { type: "fold" };
       return legal.fold ? { type: "fold" } : { type: "call" };
     }
@@ -402,6 +404,7 @@
   // Bot 1: always continues preflop; postflop only with a made hand or strong draw.
   function chooseCallingStation(table, legal, player) {
     var score = strength(player, table);
+    var price;
     if (table.variant === "five-card-draw") return chooseSkillful(table, legal, player);
     if (!table.board.length) {
       if (legal.call > 0) {
@@ -421,6 +424,11 @@
     }
     if (!canContinuePostflop(player, table)) {
       if (legal.check) return { type: "check" };
+      // Sometimes float a small stab instead of always folding air.
+      if (legal.call > 0) {
+        price = legal.call / (Poker.potSize(table) + legal.call);
+        if (price <= 0.28 && Math.random() < 0.5) return { type: "call" };
+      }
       if (legal.fold) return { type: "fold" };
       return { type: "check" };
     }
@@ -453,7 +461,7 @@
     return Math.random() < clamp(chance, 0.08, 0.96);
   }
 
-  // Bot 3: normal play 4/5 hands; on the wild hand, oversized bets only postflop, all-in only with monsters.
+  // Bot 3: mostly normal play; on the wild hand, oversized bets postflop, rare all-ins with monsters.
   function chooseManiac(table, legal, player) {
     var score;
     var made;
@@ -463,22 +471,22 @@
       if (table.street !== "draw-bet") return chooseSkillful(table, legal, player);
       score = strength(player, table);
       made = Poker.rankCards(player.hole);
-      allInWorthy = score >= 0.88 || (made && made[0] >= 5);
-      if (legal.minRaiseTo != null && !maniacFired && (allInWorthy || score >= 0.72) && Math.random() < 0.75) {
+      allInWorthy = score >= 0.93 || (made && made[0] >= 6);
+      if (legal.minRaiseTo != null && !maniacFired && (allInWorthy || score >= 0.75) && Math.random() < 0.7) {
         maniacFired = true;
-        if (allInWorthy && Math.random() < 0.7) return { type: "raise", to: legal.maxRaiseTo };
-        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.45 ? 1.2 : 1.65) };
+        if (allInWorthy && Math.random() < 0.22) return { type: "raise", to: legal.maxRaiseTo };
+        return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.9 : 1.25) };
       }
       return chooseSkillful(table, legal, player);
     }
     if (!table.board.length) return chooseSkillful(table, legal, player);
     score = strength(player, table);
     made = Poker.rankCards(player.hole.concat(table.board));
-    allInWorthy = score >= 0.88 || (made && made[0] >= 5);
+    allInWorthy = score >= 0.93 || (made && made[0] >= 6);
     if (legal.minRaiseTo != null && maniacShouldFire(table, score, made)) {
       maniacFired = true;
-      if (allInWorthy && Math.random() < 0.7) return { type: "raise", to: legal.maxRaiseTo };
-      return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.45 ? 1.2 : 1.65) };
+      if (allInWorthy && Math.random() < 0.22) return { type: "raise", to: legal.maxRaiseTo };
+      return { type: "raise", to: sizedBet(table, legal, Math.random() < 0.5 ? 0.9 : 1.25) };
     }
     return chooseSkillful(table, legal, player);
   }
@@ -496,16 +504,16 @@
     return clamp(0.5 - (Math.log(Math.max(ratio, 0.08)) / Math.LN2) * 0.28, 0.05, 0.95);
   }
 
-  // Rich bots sometimes call instead of folding; poor bots sometimes fold instead of continuing.
+  // Rich bots often call instead of folding; poor bots rarely fold instead of continuing.
   function withMoneyFear(choice, table, legal, player) {
     var fear = moneyFear(player);
     var loosen = 0.5 - fear;
     if (!choice) return choice;
-    if (choice.type === "fold" && legal.call > 0 && loosen > 0 && Math.random() < loosen * 1.35) {
+    if (choice.type === "fold" && legal.call > 0 && loosen > 0 && Math.random() < loosen * 1.9) {
       return { type: "call" };
     }
     if (legal.fold && legal.call > 0 && loosen < 0) {
-      if ((choice.type === "call" || choice.type === "raise") && Math.random() < -loosen * 1.25) {
+      if ((choice.type === "call" || choice.type === "raise") && Math.random() < -loosen * 0.55) {
         return { type: "fold" };
       }
     }
@@ -599,7 +607,7 @@
     };
   }
 
-  // Facing a big bet, fold more when value is likely; still call sometimes as a bluff-catch.
+  // Facing a big bet, sometimes fold when value is likely; still call more often as a bluff-catch.
   function withBigBetFear(choice, table, legal, player) {
     var meaning;
     var score;
@@ -611,18 +619,18 @@
     if (choice.type !== "call" && choice.type !== "raise") return choice;
     meaning = estimateBetMeaning(table, player, legal);
     // Ignore small probes; fear only kicks in on meaningfully large bets.
-    if (meaning.sizeRatio < 0.4 && legal.call < table.bb * 4) return choice;
+    if (meaning.sizeRatio < 0.45 && legal.call < table.bb * 5) return choice;
     score = strength(player, table);
     pot = Poker.potSize(table);
     price = legal.call / (pot + legal.call);
-    needed = price * (0.55 + meaning.valueChance * 0.95);
-    if (score >= Math.max(needed, meaning.valueChance * 0.7) + 0.04) return choice;
-    if (score >= price && Math.random() < meaning.bluffChance * 0.7) {
+    needed = price * (0.48 + meaning.valueChance * 0.8);
+    if (score >= Math.max(needed, meaning.valueChance * 0.58) + 0.02) return choice;
+    if (score >= price * 0.85 && Math.random() < meaning.bluffChance * 0.85) {
       return choice.type === "raise" ? { type: "call" } : choice;
     }
-    fear = meaning.valueChance * clamp((meaning.sizeRatio - 0.3) / 1.05, 0.2, 1);
+    fear = meaning.valueChance * clamp((meaning.sizeRatio - 0.35) / 1.2, 0.12, 0.78) * 0.62;
     if (Math.random() < fear) return { type: "fold" };
-    if (choice.type === "raise" && Math.random() < fear * 0.85) return { type: "call" };
+    if (choice.type === "raise" && Math.random() < fear * 0.7) return { type: "call" };
     return choice;
   }
 

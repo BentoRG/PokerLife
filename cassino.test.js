@@ -115,7 +115,7 @@ check("withBigBetFear often folds weak hands to huge bets", function () {
   } finally {
     Math.random = original;
   }
-  assert.ok(folds >= 20, "expected frequent folds to a huge bet with trash, got " + folds);
+  assert.ok(folds >= 8, "expected some folds to a huge bet with trash, got " + folds);
 });
 
 check("blindsForMoney uses 3% of money floored for the big blind", function () {
