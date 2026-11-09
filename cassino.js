@@ -767,6 +767,48 @@
     return out;
   }
 
+  function roomPlayerSeated(list, id) {
+    var i;
+    if (!id || !Array.isArray(list)) return false;
+    for (i = 0; i < list.length; i += 1) {
+      if (list[i] && list[i].id === id && !list[i].left) return true;
+    }
+    return false;
+  }
+
+  function pendingJoinsOf(remote) {
+    return Array.isArray(remote && remote.pendingJoins) ? remote.pendingJoins.slice() : [];
+  }
+
+  function roomSeatCount(remote) {
+    var pending = pendingJoinsOf(remote);
+    var seated = activeRoomPlayers(remote && remote.players);
+    var ids = {};
+    var count = 0;
+    var i;
+    var entry;
+    for (i = 0; i < seated.length; i += 1) {
+      ids[seated[i].id] = true;
+      count += 1;
+    }
+    for (i = 0; i < pending.length; i += 1) {
+      entry = pending[i];
+      if (!entry || typeof entry.id !== "string" || !entry.id || ids[entry.id]) continue;
+      ids[entry.id] = true;
+      count += 1;
+    }
+    return count;
+  }
+
+  function localSeatedInHand() {
+    var i;
+    if (!state || !Array.isArray(state.players) || !localPlayerId) return false;
+    for (i = 0; i < state.players.length; i += 1) {
+      if (state.players[i] && state.players[i].id === localPlayerId) return true;
+    }
+    return false;
+  }
+
   function publishRoom(next) {
     var api = auth();
     if (!api || !roomCode || !next) return Promise.resolve(null);
@@ -1277,6 +1319,7 @@
         phase: "lobby",
         variant: gameVariant,
         players: [{ id: name, name: name, stack: money, left: false }],
+        pendingJoins: [],
         button: 0,
         matchSb: FRIENDS_SB,
         matchBb: FRIENDS_BB,
@@ -1309,48 +1352,71 @@
     var money = heroMoney();
     var attempt = 0;
 
+    function finishJoin(saved) {
+      room = saved;
+      roomCode = code;
+      localPlayerId = name;
+      isHost = saved.hostId === name;
+      vsFriends = true;
+      vsBots = false;
+      gameVariant = saved.variant === "five-card-draw" ? "five-card-draw" : "holdem";
+      pendingVariant = gameVariant;
+      if (saved.phase === "playing") {
+        if (roomPlayerSeated(saved.players, name)) {
+          showFriendsNotice("");
+          enterFriendsMatch(saved);
+          return;
+        }
+        showFriendsNotice("Entrando na partida… você joga a próxima mão.");
+        showFriendsWaiting();
+        beginRoomPoll(pollFriendsJoin);
+        return;
+      }
+      showFriendsNotice("");
+      showFriendsWaiting();
+      beginRoomPoll(pollFriendsLobby);
+    }
+
     function tryJoin() {
       attempt += 1;
       return api.loadRoom(code).then(function (existing) {
         var players;
+        var pending;
         var i;
         if (!existing || existing.phase === "closed") {
           throw new Error("missing");
         }
-        if (existing.phase !== "lobby") {
-          throw new Error("started");
+        if (existing.phase !== "lobby" && existing.phase !== "playing") {
+          throw new Error("closed");
         }
         players = Array.isArray(existing.players) ? existing.players.slice() : [];
-        for (i = 0; i < players.length; i += 1) {
-          if (players[i] && players[i].id === name && !players[i].left) {
+        if (roomPlayerSeated(players, name)) {
+          room = existing;
+          return existing;
+        }
+        pending = pendingJoinsOf(existing);
+        for (i = 0; i < pending.length; i += 1) {
+          if (pending[i] && pending[i].id === name) {
             room = existing;
             return existing;
           }
         }
-        players = activeRoomPlayers(players);
-        if (players.length >= MAX_FRIENDS) throw new Error("full");
-        players.push({ id: name, name: name, stack: money, left: false });
-        existing.players = players;
+        if (roomSeatCount(existing) >= MAX_FRIENDS) throw new Error("full");
+        if (existing.phase === "lobby") {
+          players = activeRoomPlayers(players);
+          players.push({ id: name, name: name, stack: money, left: false });
+          existing.players = players;
+          existing.pendingJoins = [];
+          return api.saveRoom(code, existing);
+        }
+        pending.push({ id: name, name: name, stack: money });
+        existing.pendingJoins = pending;
         return api.saveRoom(code, existing);
       }).then(function (saved) {
-        room = saved;
-        roomCode = code;
-        localPlayerId = name;
-        isHost = saved.hostId === name;
-        vsFriends = true;
-        vsBots = false;
-        gameVariant = saved.variant === "five-card-draw" ? "five-card-draw" : "holdem";
-        pendingVariant = gameVariant;
-        showFriendsNotice("");
-        showFriendsWaiting();
-        beginRoomPoll(pollFriendsLobby);
+        finishJoin(saved);
       }, function (error) {
         if (error && error.message === "missing") {
           showFriendsNotice("Sala não encontrada.");
-          return;
-        }
-        if (error && error.message === "started") {
-          showFriendsNotice("Essa partida já começou.");
           return;
         }
         if (error && error.message === "full") {
@@ -1376,6 +1442,63 @@
     }
     showFriendsNotice("Entrando…");
     tryJoin();
+  }
+
+  function pollFriendsJoin() {
+    var api = auth();
+    if (!api || !roomCode || publishing) return;
+    api.loadRoom(roomCode).then(function (remote) {
+      var pending;
+      var i;
+      var found;
+      if (!remote || remote.phase === "closed") {
+        showFriendsNotice("A sala foi fechada.");
+        exitFriendsToMenu();
+        return;
+      }
+      room = remote;
+      lastRoomSeq = remote.seq || lastRoomSeq;
+      gameVariant = remote.variant === "five-card-draw" ? "five-card-draw" : "holdem";
+      if (roomPlayerSeated(remote.players, localPlayerId)) {
+        stopRoomPoll();
+        showFriendsNotice("");
+        enterFriendsMatch(remote);
+        return;
+      }
+      if (remote.phase !== "playing") {
+        showFriendsNotice("");
+        showFriendsWaiting();
+        beginRoomPoll(pollFriendsLobby);
+        return;
+      }
+      if (roomSeatCount(remote) >= MAX_FRIENDS && !roomPlayerSeated(remote.players, localPlayerId)) {
+        pending = pendingJoinsOf(remote);
+        found = false;
+        for (i = 0; i < pending.length; i += 1) {
+          if (pending[i] && pending[i].id === localPlayerId) found = true;
+        }
+        if (!found) {
+          showFriendsNotice("A sala está cheia.");
+          exitFriendsToMenu();
+          return;
+        }
+      }
+      pending = pendingJoinsOf(remote);
+      found = false;
+      for (i = 0; i < pending.length; i += 1) {
+        if (pending[i] && pending[i].id === localPlayerId) found = true;
+      }
+      if (!found) {
+        pending.push({
+          id: localPlayerId,
+          name: localPlayerId,
+          stack: heroMoney(),
+        });
+        remote.pendingJoins = pending;
+        api.saveRoom(roomCode, remote).catch(function () {});
+      }
+      paintRoomPlayers();
+    }).catch(function () {});
   }
 
   function pollFriendsLobby() {
@@ -1425,6 +1548,7 @@
       phase: "playing",
       variant: gameVariant,
       players: players,
+      pendingJoins: [],
       button: button,
       matchSb: matchSb,
       matchBb: matchBb,
@@ -1487,6 +1611,7 @@
       phase: "playing",
       variant: gameVariant,
       players: players,
+      pendingJoins: [],
       button: button,
       matchSb: matchSb,
       matchBb: matchBb,
@@ -1558,6 +1683,7 @@
       if ((remote.seq || 0) < lastRoomSeq && isHost) return;
       if (isHost) {
         room = remote;
+        if (absorbPendingJoins(remote)) return;
         if (remote.pendingAction && state && !handClosing) {
           actor = state.toAct >= 0 ? state.players[state.toAct] : null;
           if (
@@ -1589,6 +1715,41 @@
         renderActions();
       }
     }).catch(function () {});
+  }
+
+  function absorbPendingJoins(remote) {
+    var pending;
+    var joined = [];
+    var i;
+    var join;
+    var stack;
+    if (!isHost || !remote || !roster) return false;
+    pending = pendingJoinsOf(remote);
+    if (!pending.length) return false;
+    for (i = 0; i < pending.length; i += 1) {
+      join = pending[i];
+      if (!join || typeof join.id !== "string" || !join.id) continue;
+      if (roomPlayerSeated(roster, join.id)) continue;
+      if (roster.length >= MAX_FRIENDS) continue;
+      stack = join.stack > 0 ? Math.round(join.stack) : FRIENDS_BB * 50;
+      roster.push({
+        id: join.id,
+        name: join.name || join.id,
+        stack: stack,
+        left: false,
+        isHuman: true,
+      });
+      joined.push(join.name || join.id);
+    }
+    room.pendingJoins = [];
+    if (!joined.length) {
+      if (pending.length) publishFriendsState();
+      return pending.length > 0;
+    }
+    statusMessage = joined.join(", ") + (joined.length === 1 ? " entra" : " entram") + " na próxima mão";
+    setStatus(statusMessage);
+    publishFriendsState();
+    return true;
   }
 
   function handleFriendsLeaves(remote) {
@@ -1717,6 +1878,9 @@
         if (players[i] && players[i].id === localPlayerId) players[i].left = true;
       }
       remote.players = players;
+      remote.pendingJoins = pendingJoinsOf(remote).filter(function (entry) {
+        return !(entry && entry.id === localPlayerId);
+      });
       if (remote.phase === "lobby") {
         remote.players = activeRoomPlayers(players);
       }
@@ -2296,9 +2460,17 @@
     var player = null;
     var skip;
     var localTurn = false;
+    var note;
     clear(box);
     if (raiseBox) raiseBox.remove();
     if (!state || handClosing) return;
+    if (vsFriends && localPlayerId && !localSeatedInHand()) {
+      note = document.createElement("p");
+      note.className = "friends-wait-note";
+      note.textContent = "Você entra na próxima mão…";
+      box.appendChild(note);
+      return;
+    }
     if (canSkipRound()) {
       appendBettingSlots(box, null, null);
       skip = actionButton("Pular ao fim", skipToHandEnd);
@@ -2314,14 +2486,14 @@
       if (legal && legal.discard) {
         (function () {
           var picks = selectedDiscardList();
-          var note = el(
+          var discardNote = el(
             "p",
             "discard-hint",
             picks.length
               ? "Selecionadas: " + picks.length
               : "Toque nas cartas que deseja trocar"
           );
-          box.appendChild(note);
+          box.appendChild(discardNote);
           box.appendChild(actionButton("Ficar", function () {
             confirmDiscard([]);
           }));
