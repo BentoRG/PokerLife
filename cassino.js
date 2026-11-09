@@ -1746,7 +1746,7 @@
       return api.saveRoom(roomCode, remote);
     }).then(function (saved) {
       if (saved) room = saved;
-      clear(document.getElementById("actions"));
+      lockActionButtons();
       setStatus("Enviando jogada…");
     }).catch(function () {
       renderActions();
@@ -2160,19 +2160,58 @@
     return (STREETS[state.street] || "") + " · pote $" + Poker.potSize(state);
   }
 
-  function actionButton(label, onClick) {
+  function actionButton(label, onClick, enabled) {
     var node = document.createElement("button");
     node.type = "button";
     node.textContent = label;
+    if (enabled === false) {
+      node.disabled = true;
+      node.classList.add("action-blurred");
+      return node;
+    }
     node.addEventListener("click", onClick);
     return node;
   }
 
+  function lockActionButtons() {
+    var box = document.getElementById("actions");
+    var raiseBox = document.getElementById("raise-box");
+    var buttons;
+    var i;
+    if (raiseBox) raiseBox.remove();
+    if (!box) return;
+    buttons = box.querySelectorAll("button");
+    for (i = 0; i < buttons.length; i += 1) {
+      buttons[i].disabled = true;
+      buttons[i].classList.add("action-blurred");
+    }
+  }
+
+  function appendBettingSlots(box, legal, player) {
+    var canFold = !!(legal && legal.fold);
+    var canCheck = !!(legal && legal.check);
+    var canCall = !!(legal && legal.call > 0);
+    var canRaise = !!(legal && legal.minRaiseTo != null);
+    var onlyAllInRaise = canRaise && legal.minRaiseTo === legal.maxRaiseTo;
+    var callLabel = "Pagar";
+    var raiseLabel = state && state.currentBet === 0 ? "Apostar" : "Aumentar";
+    var allInLabel = "All-in";
+    if (canCall) {
+      callLabel = legal.call === player.stack ? "All-in $" + legal.call : "Pagar $" + legal.call;
+    }
+    if (canRaise && onlyAllInRaise) allInLabel = "All-in $" + player.stack;
+    box.appendChild(actionButton("Desistir", function () { humanAct("fold"); }, canFold));
+    box.appendChild(actionButton("Passar", function () { humanAct("check"); }, canCheck));
+    box.appendChild(actionButton(callLabel, function () { humanAct("call"); }, canCall));
+    box.appendChild(actionButton(raiseLabel, function () { openRaise(legal); }, canRaise && !onlyAllInRaise));
+    box.appendChild(actionButton(allInLabel, function () {
+      humanAct("raise", legal.maxRaiseTo);
+    }, canRaise));
+  }
+
   function humanAct(type, to) {
     var result;
-    var raiseBox = document.getElementById("raise-box");
-    clear(document.getElementById("actions"));
-    if (raiseBox) raiseBox.remove();
+    lockActionButtons();
     if (type === "discard") selectedDiscards = {};
     if (vsFriends && !isHost) {
       submitFriendsAction(type, to);
@@ -2253,64 +2292,50 @@
   function renderActions() {
     var box = document.getElementById("actions");
     var raiseBox = document.getElementById("raise-box");
-    var legal;
-    var player;
+    var legal = null;
+    var player = null;
     var skip;
+    var localTurn = false;
     clear(box);
     if (raiseBox) raiseBox.remove();
     if (!state || handClosing) return;
     if (canSkipRound()) {
+      appendBettingSlots(box, null, null);
       skip = actionButton("Pular ao fim", skipToHandEnd);
       skip.id = "skip-round";
       skip.className = "skip-round";
       box.appendChild(skip);
       return;
     }
-    if (state.handOver || state.toAct < 0 || !isLocalPlayer(state.players[state.toAct])) return;
-    legal = Poker.legalActions(state);
-    player = state.players[state.toAct];
-    if (legal && legal.discard) {
-      (function () {
-        var picks = selectedDiscardList();
-        var note = el(
-          "p",
-          "discard-hint",
-          picks.length
-            ? "Selecionadas: " + picks.length
-            : "Toque nas cartas que deseja trocar"
-        );
-        box.appendChild(note);
-        box.appendChild(actionButton("Ficar", function () {
-          confirmDiscard([]);
-        }));
-        if (picks.length) {
-          box.appendChild(actionButton("Trocar " + picks.length, function () {
-            confirmDiscard(picks);
+    localTurn = !state.handOver && state.toAct >= 0 && isLocalPlayer(state.players[state.toAct]);
+    if (localTurn) {
+      legal = Poker.legalActions(state);
+      player = state.players[state.toAct];
+      if (legal && legal.discard) {
+        (function () {
+          var picks = selectedDiscardList();
+          var note = el(
+            "p",
+            "discard-hint",
+            picks.length
+              ? "Selecionadas: " + picks.length
+              : "Toque nas cartas que deseja trocar"
+          );
+          box.appendChild(note);
+          box.appendChild(actionButton("Ficar", function () {
+            confirmDiscard([]);
           }));
-        }
-      })();
-      return;
+          box.appendChild(actionButton(
+            picks.length ? "Trocar " + picks.length : "Trocar",
+            function () { confirmDiscard(picks); },
+            picks.length > 0
+          ));
+        })();
+        return;
+      }
     }
-    if (legal.fold) box.appendChild(actionButton("Desistir", function () { humanAct("fold"); }));
-    if (legal.check) box.appendChild(actionButton("Passar", function () { humanAct("check"); }));
-    if (legal.call > 0) {
-      box.appendChild(actionButton(
-        legal.call === player.stack ? "All-in $" + legal.call : "Pagar $" + legal.call,
-        function () { humanAct("call"); }
-      ));
-    }
-    if (legal.minRaiseTo != null && legal.minRaiseTo === legal.maxRaiseTo) {
-      box.appendChild(actionButton("All-in $" + player.stack, function () {
-        humanAct("raise", legal.maxRaiseTo);
-      }));
-    } else if (legal.minRaiseTo != null) {
-      box.appendChild(actionButton(state.currentBet === 0 ? "Apostar" : "Aumentar", function () {
-        openRaise(legal);
-      }));
-      box.appendChild(actionButton("All-in", function () {
-        humanAct("raise", legal.maxRaiseTo);
-      }));
-    }
+    // Always keep the five betting slots in place; blur ones that are not legal.
+    appendBettingSlots(box, localTurn ? legal : null, player);
   }
 
   function keepHeroVisible() {

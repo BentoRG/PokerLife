@@ -1043,6 +1043,34 @@ main {
   cursor: pointer;
 }
 
+/* Fixed betting slots: Desistir · Passar · Pagar · Apostar · All-in */
+.actions:not(:has(.play-again)):not(:has(.discard-hint)):not(:has(.friends-wait-note)) {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.actions:not(:has(.play-again)):not(:has(.discard-hint)):not(:has(.friends-wait-note)) button {
+  flex: none;
+  min-width: 0;
+}
+
+.actions:not(:has(.play-again)):not(:has(.discard-hint)):not(:has(.friends-wait-note)) .skip-round {
+  grid-column: 1 / -1;
+}
+
+.actions button.action-blurred,
+.actions button:disabled {
+  opacity: 0.38;
+  filter: blur(0.7px);
+  cursor: default;
+  pointer-events: none;
+}
+
+.actions button.action-blurred:hover,
+.actions button:disabled:hover {
+  background: #fff;
+}
+
 .raise-box input {
   flex: 1.4 1 12rem;
   cursor: text;
@@ -1659,6 +1687,11 @@ main {
     min-height: 2.75rem;
     padding: 0.65rem 0.35rem;
     font-size: 0.98rem;
+  }
+
+  .actions:not(:has(.play-again)):not(:has(.discard-hint)):not(:has(.friends-wait-note)) button {
+    padding: 0.65rem 0.2rem;
+    font-size: 0.82rem;
   }
 
   .controls:has(button:not([hidden])) {
