@@ -64,9 +64,9 @@
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
-  // Bot 4 picks one of the other three personalities at random each hand.
-  var raviStyle = null;
-  // Bot 3 (maniac): wild big-bet mood on 1 of 5 hands; otherwise plays normally.
+  // Personalities are shuffled onto Bot 1–4 each hand (maniac/bluffer/calling-station move around).
+  var botStyles = {};
+  // Maniac style: wild big-bet mood on ~12% of hands; otherwise plays normally.
   var maniacWildHand = false;
   var maniacFired = false;
   // Stack bots started the match with; used so richer bots fold less and poorer ones fold more.
@@ -116,7 +116,7 @@
           shownHoles: shownHoles,
           handClosing: handClosing,
           statusMessage: statusMessage,
-          raviStyle: raviStyle,
+          botStyles: botStyles,
           maniacWildHand: maniacWildHand,
           maniacFired: maniacFired,
           startStack: startStack,
@@ -321,8 +321,22 @@
     return skill == null ? 10 : skill;
   }
 
-  function pickRaviStyle() {
-    raviStyle = STYLES[Math.floor(Math.random() * STYLES.length)];
+  function pickBotStyles() {
+    var ids = ["lia", "caio", "duda", "ravi"];
+    var styles = STYLES.slice();
+    var i;
+    var j;
+    var tmp;
+    // Four bots, three styles: keep every style in play, then add one random duplicate.
+    styles.push(STYLES[Math.floor(Math.random() * STYLES.length)]);
+    for (i = styles.length - 1; i > 0; i -= 1) {
+      j = Math.floor(Math.random() * (i + 1));
+      tmp = styles[i];
+      styles[i] = styles[j];
+      styles[j] = tmp;
+    }
+    botStyles = {};
+    for (i = 0; i < ids.length; i += 1) botStyles[ids[i]] = styles[i];
   }
 
   function pickManiacMood() {
@@ -331,10 +345,7 @@
   }
 
   function styleOf(player) {
-    if (player.id === "lia") return "calling-station";
-    if (player.id === "caio") return "bluffer";
-    if (player.id === "duda") return "maniac";
-    if (player.id === "ravi") return raviStyle || "calling-station";
+    if (botStyles[player.id]) return botStyles[player.id];
     return "calling-station";
   }
 
@@ -401,7 +412,7 @@
     return { type: "check" };
   }
 
-  // Bot 1: always continues preflop; postflop only with a made hand or strong draw.
+  // Calling-station: always continues preflop; postflop only with a made hand or strong draw.
   function chooseCallingStation(table, legal, player) {
     var score = strength(player, table);
     var price;
@@ -435,7 +446,7 @@
     return chooseSkillful(table, legal, player);
   }
 
-  // Bot 2: bluffs 3 out of 5 times when the hand is not strong enough to value-bet.
+  // Bluffer: bluffs 3 out of 5 times when the hand is not strong enough to value-bet.
   function chooseBluffer(table, legal, player) {
     var score = strength(player, table);
     if (legal.minRaiseTo != null && score < 0.62 && Math.random() < 0.6) {
@@ -461,7 +472,7 @@
     return Math.random() < clamp(chance, 0.08, 0.96);
   }
 
-  // Bot 3: mostly normal play; on the wild hand, oversized bets postflop, rare all-ins with monsters.
+  // Maniac: mostly normal play; on the wild hand, oversized bets postflop, rare all-ins with monsters.
   function chooseManiac(table, legal, player) {
     var score;
     var made;
@@ -1866,8 +1877,11 @@
     startStack = saved.startStack > 0 ? saved.startStack : botStack();
     matchSb = saved.matchSb > 0 ? saved.matchSb : blindsForMoney(heroMoney()).sb;
     matchBb = saved.matchBb > 0 ? saved.matchBb : blindsForMoney(heroMoney()).bb;
-    raviStyle = STYLES.indexOf(saved.raviStyle) >= 0 ? saved.raviStyle : null;
-    if (!raviStyle) pickRaviStyle();
+    if (saved.botStyles && typeof saved.botStyles === "object") {
+      botStyles = saved.botStyles;
+    } else {
+      pickBotStyles();
+    }
     maniacWildHand = !!saved.maniacWildHand;
     maniacFired = !!saved.maniacFired;
     hideNotice();
@@ -2569,7 +2583,7 @@
     shownHoles = false;
     handClosing = false;
     selectedDiscards = {};
-    pickRaviStyle();
+    pickBotStyles();
     pickManiacMood();
     if (actions) clear(actions);
     if (raiseBox) raiseBox.remove();
