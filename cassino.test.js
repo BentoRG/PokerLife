@@ -14,7 +14,7 @@ function tableFacingBet(opts) {
   var state = Poker.createHand({
     players: [
       { id: "hero", name: "Hero", stack: opts.heroStack || 500, isHuman: true },
-      { id: "lia", name: "Bot 1", stack: opts.botStack || 500, isHuman: false },
+      { id: "lia", name: "Bot Marcos", stack: opts.botStack || 500, isHuman: false },
     ],
     button: 0,
     sb: 5,
@@ -169,7 +169,7 @@ check("draw bots discard instead of betting on the draw street", function () {
     variant: "five-card-draw",
     players: [
       { id: "hero", name: "Hero", stack: 500, isHuman: true },
-      { id: "lia", name: "Bot 1", stack: 500, isHuman: false },
+      { id: "lia", name: "Bot Marcos", stack: 500, isHuman: false },
     ],
     button: 0,
     sb: 5,

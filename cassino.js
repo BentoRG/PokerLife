@@ -64,7 +64,7 @@
   var statusMessage = "";
   var noticeTimer;
   var NOTICE_MS = 3200;
-  // Personalities are shuffled onto Bot 1–4 each hand (maniac/bluffer/calling-station move around).
+  // Personalities are shuffled onto the named bots each hand (maniac/bluffer/calling-station move around).
   var botStyles = {};
   // Maniac style: wild big-bet mood on ~12% of hands; otherwise plays normally.
   var maniacWildHand = false;
@@ -79,10 +79,10 @@
   var FRIENDS_BB = 20;
   var MAX_FRIENDS = 5;
   var FRIEND_BOTS = [
-    { id: "lia", name: "Bot 1" },
-    { id: "caio", name: "Bot 2" },
-    { id: "duda", name: "Bot 3" },
-    { id: "ravi", name: "Bot 4" },
+    { id: "lia", name: "Bot Marcos" },
+    { id: "caio", name: "Bot Vasquinho" },
+    { id: "duda", name: "Bot Lirili" },
+    { id: "ravi", name: "Bot Flixa Nates" },
   ];
   var ROOM_POLL_MS = 2500;
   var roomCode = null;
@@ -1994,10 +1994,10 @@
     matchBb = blinds.bb;
     roster = [
       { id: "hero", name: "Você", stack: money, isHuman: true },
-      { id: "lia", name: "Bot 1", stack: stack, isHuman: false },
-      { id: "caio", name: "Bot 2", stack: stack, isHuman: false },
-      { id: "duda", name: "Bot 3", stack: stack, isHuman: false },
-      { id: "ravi", name: "Bot 4", stack: stack, isHuman: false },
+      { id: "lia", name: "Bot Marcos", stack: stack, isHuman: false },
+      { id: "caio", name: "Bot Vasquinho", stack: stack, isHuman: false },
+      { id: "duda", name: "Bot Lirili", stack: stack, isHuman: false },
+      { id: "ravi", name: "Bot Flixa Nates", stack: stack, isHuman: false },
     ];
     button = roster.length - 1;
   }
