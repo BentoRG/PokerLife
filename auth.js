@@ -9,7 +9,7 @@
   var OPENING_CUT = 350;
   var ALLOWANCE = 100;
   var ALLOWANCE_HOUR = 7;
-  var BROKE_ALLOWANCE_CUT = 15;
+  var BROKE_ALLOWANCE_CUT = 5;
   var SAVINGS_DAILY_RATE = 0.015;
   var LOAN_PRINCIPAL = 100;
   var LOAN_DAILY_FEE = 5;
@@ -253,12 +253,35 @@
     writeAccounts(accounts).catch(function () {});
   }
 
+  // One-time: restore every player's mesada to the full $100 base.
+  function resetAllowancesToFull() {
+    var accounts = readAccounts();
+    var changed = false;
+    var i;
+    var account;
+    for (i = 0; i < accounts.length; i += 1) {
+      account = accounts[i];
+      if (!account || typeof account !== "object" || account.allowanceReset100) continue;
+      if (allowancePenaltyOf(account) > 0 || account.brokeAllowanceNotice) {
+        delete account.allowancePenalty;
+        delete account.brokeAllowanceNotice;
+      }
+      account.allowanceReset100 = true;
+      touchAccount(account);
+      changed = true;
+    }
+    if (!changed) return;
+    writeAccounts(accounts).catch(function () {});
+  }
+
   syncAccounts()
     .then(function () {
       applyOpeningCut();
+      resetAllowancesToFull();
       if (!isLoginPage() && currentUser()) paintAccount();
     })
     .catch(function () {
+      resetAllowancesToFull();
       if (!isLoginPage() && currentUser()) paintAccount();
     });
 
@@ -653,8 +676,15 @@
     account.brokeAllowanceNotice = BROKE_ALLOWANCE_CUT;
   }
 
+  function hasOpenSavings(account) {
+    return readSavings(account).length > 0;
+  }
+
   function maybeBroke(account, previousMoney, nextMoney) {
-    if (previousMoney > 0 && nextMoney <= 0) applyBrokePenalty(account);
+    if (!(previousMoney > 0 && nextMoney <= 0)) return;
+    // Cash went to zero, but money still locked in poupança does not count as broke.
+    if (hasOpenSavings(account)) return;
+    applyBrokePenalty(account);
   }
 
   function setMoney(amount, label, detail) {
