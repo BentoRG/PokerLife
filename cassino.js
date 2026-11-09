@@ -1040,7 +1040,7 @@
     opts = opts || {};
     winners = winners || {};
     payout = winners[player.id];
-    if (logicalIndex === state.toAct) className += " acting";
+    if (state.toAct >= 0 && logicalIndex === state.toAct && !state.handOver) className += " acting";
     if (player.folded) className += " folded";
     if (payout) className += " winner";
     seat = el("article", className);
